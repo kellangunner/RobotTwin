@@ -31,6 +31,8 @@ MANIFEST
 #   before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
+# Fusion 360 script manifests are source, not build output
+!engineering/**/*.manifest
 
 # Installer logs
 pip-log.txt
