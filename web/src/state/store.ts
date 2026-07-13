@@ -22,6 +22,7 @@ import type { GearboxParams, JointName, RobotConfig } from '../core/config';
 import { parseRobotConfig } from '../core/config';
 import type { DriveSelection } from '../core/gearboxModel';
 import type { JointAngles, Vec3, IkBranch } from '../core/kinematics';
+import { retimeForTorque } from '../core/retime';
 import type { TrajectoryPlan } from '../core/trajectory';
 import { deg2rad } from '../core/units';
 
@@ -46,6 +47,8 @@ export interface MoveReport {
   peakJoint: JointName;
   skippedSteps: boolean;    // peak > 1 → open-loop steppers would lose position
   infeasible: boolean;      // a joint had zero speed/accel budget at plan time
+  /** Duration multiplier the torque governor applied (1 = timing was safe). */
+  stretch: number;
 }
 
 interface Motion {
@@ -66,6 +69,7 @@ export interface SequenceState {
   peakJoint: JointName;
   infeasible: boolean;
   totalDuration: number;
+  maxStretch: number;
 }
 
 /** Dwell at each waypoint before moving on. */
@@ -104,6 +108,8 @@ interface TwinState {
 const TRACE_CAP = 800;
 /** Plan below the hard drivetrain ceilings so utilization stays finite. */
 const SPEED_PLANNING_MARGIN = 0.8;
+/** The torque governor slows every move until utilization fits this ceiling. */
+const TORQUE_UTILIZATION_CEILING = 0.95;
 
 function pickIkSolution(
   target: Vec3,
@@ -155,8 +161,15 @@ export const useTwinStore = create<TwinState>((set, get) => {
   ): { plan: TrajectoryPlan; report: MoveReport } => {
     const metrics = computeMetrics(config, s.gearboxes, from, s.payload);
     const vmax = metrics.vmax.map((v) => v * SPEED_PLANNING_MARGIN) as [number, number, number];
-    const plan = planTrajectory(from, to, vmax, metrics.amax);
-    const audit = auditTrajectory(config, s.gearboxes, plan, s.payload);
+    const raw = planTrajectory(from, to, vmax, metrics.amax);
+    // Torque governor: stretch the duration until the predictive audit fits
+    // the budget, so a commanded move can never outrun the torque limit.
+    // Only a static overload (gravity alone beats the budget) stays `limited`.
+    const { plan, audit, stretch } = retimeForTorque(
+      raw,
+      (p) => auditTrajectory(config, s.gearboxes, p, s.payload),
+      TORQUE_UTILIZATION_CEILING,
+    );
     return {
       plan,
       report: {
@@ -164,7 +177,8 @@ export const useTwinStore = create<TwinState>((set, get) => {
         peakUtilization: audit.peakUtilization,
         peakJoint: audit.peakJoint,
         skippedSteps: audit.skippedSteps,
-        infeasible: plan.infeasible,
+        infeasible: raw.infeasible,
+        stretch,
       },
     };
   };
@@ -180,6 +194,7 @@ export const useTwinStore = create<TwinState>((set, get) => {
     peakJoint: seq.peakJoint,
     skippedSteps: seq.peakUtilization > 1,
     infeasible: seq.infeasible,
+    stretch: seq.maxStretch,
   });
 
   // Ticks only animate and advance the waypoint sequence; all physics and
@@ -221,6 +236,7 @@ export const useTwinStore = create<TwinState>((set, get) => {
             report.peakUtilization > seq.peakUtilization ? report.peakJoint : seq.peakJoint,
           infeasible: seq.infeasible || report.infeasible,
           totalDuration: seq.totalDuration + report.duration,
+          maxStretch: Math.max(seq.maxStretch, report.stretch),
         },
       });
       return;
@@ -391,6 +407,7 @@ export const useTwinStore = create<TwinState>((set, get) => {
           peakJoint: report.peakJoint,
           infeasible: report.infeasible,
           totalDuration: report.duration,
+          maxStretch: report.stretch,
         },
       });
     },

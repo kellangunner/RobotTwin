@@ -106,9 +106,20 @@ export function MetricsPanel() {
             >
               {(lastMove.peakUtilization * 100).toFixed(0)}% ({lastMove.peakJoint})
             </dd>
+            <dt className="text-slate-400">Torque governor</dt>
+            <dd
+              className={`text-right tabular-nums ${
+                lastMove.stretch > 1.001 ? 'text-sky-300' : 'text-slate-500'
+              }`}
+            >
+              {lastMove.stretch > 1.001
+                ? `slowed ×${lastMove.stretch.toFixed(2)}`
+                : 'not needed'}
+            </dd>
             {lastMove.skippedSteps && (
               <dd className="col-span-2 text-red-400">
-                ⚠ torque exceeded — open-loop steppers would skip steps here
+                ⚠ torque exceeded at any speed — gravity load beats the torque budget;
+                open-loop steppers would skip steps here
               </dd>
             )}
             {lastMove.infeasible && (
