@@ -2849,3 +2849,69 @@ events:
         - "/"
       CMAKE_FIND_ROOT_PATH: "C:/Users/kgunner/emsdk/upstream/emscripten/cache/sysroot"
 ...
+
+---
+events:
+  -
+    kind: "find-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/Platform/Emscripten.cmake:6 (find_file)"
+      - "C:/Program Files/CMake/share/cmake-4.4/Modules/CMakeSystemSpecificInformation.cmake:32 (include)"
+      - "CMakeLists.txt:2 (project)"
+    mode: "file"
+    variable: "_EMSCRIPTEN_PLATFORM_MODULE"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "NEVER"
+      SearchAppBundle: "NEVER"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "Platform/Emscripten.cmake"
+    candidate_directories:
+      - "C:/Users/kgunner/emsdk/upstream/emscripten/cmake/Modules/"
+    found: "C:/Users/kgunner/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake"
+    search_context:
+      ENV{PATH}:
+        - "C:\\Users\\kgunner\\emsdk"
+        - "C:\\Users\\kgunner\\emsdk\\upstream\\emscripten"
+        - "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.19.10-hotspot\\bin"
+        - "C:\\Program Files (x86)\\NVIDIA Corporation\\PhysX\\Common"
+        - "C:\\Windows\\system32"
+        - "C:\\Windows"
+        - "C:\\Windows\\System32\\Wbem"
+        - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\"
+        - "C:\\Windows\\System32\\OpenSSH\\"
+        - "C:\\Program Files (x86)\\Windows Kits\\8.1\\Windows Performance Toolkit\\"
+        - "C:\\Program Files\\Git\\cmd"
+        - "C:\\Program Files\\MATLAB\\R2024a\\bin"
+        - "C:\\ProgramData\\chocolatey\\bin"
+        - "C:\\Program Files\\nodejs\\"
+        - "C:\\Program Files\\Maven\\bin"
+        - "C:\\Program Files\\dotnet\\"
+        - "C:\\Program Files\\Common Files\\Autodesk Shared\\"
+        - "C:\\Program Files\\Microsoft SQL Server\\150\\Tools\\Binn\\"
+        - "C:\\Program Files (x86)\\Windows Kits\\10\\Windows Performance Toolkit\\"
+        - "C:\\Users\\kgunner\\AppData\\Local\\Programs\\Python\\Launcher\\"
+        - "C:\\Users\\kgunner\\.cargo\\bin"
+        - "C:\\Users\\kgunner\\AppData\\Local\\Microsoft\\WindowsApps"
+        - "C:\\Users\\kgunner\\AppData\\Local\\GitHubDesktop\\bin"
+        - "C:\\Users\\kgunner\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
+        - "C:\\Users\\kgunner\\AppData\\Local\\Python\\bin"
+        - "C:\\Users\\kgunner\\AppData\\Local\\Programs\\cursor\\resources\\app\\bin"
+        - "C:\\Users\\kgunner\\AppData\\Roaming\\npm"
+        - "C:\\Program Files\\Maven\\apache-maven-3.9.16\\bin"
+        - "C:\\Users\\kgunner\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\"
+        - "C:\\Users\\kgunner\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64"
+        - "C:\\Users\\kgunner\\AppData\\Local\\Pandoc\\"
+        - "C:\\Users\\kgunner\\AppData\\Local\\Programs\\Python\\Python312"
+        - "C:\\Program Files\\nodejs"
+        - "C:\\Program Files\\Git\\mingw64\\bin"
+      CMAKE_INSTALL_PREFIX: "C:/Users/kgunner/emsdk/upstream/emscripten/cache/sysroot"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/"
+      CMAKE_FIND_ROOT_PATH: "C:/Users/kgunner/emsdk/upstream/emscripten/cache/sysroot"
+...

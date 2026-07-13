@@ -16,6 +16,7 @@ import {
   planTrajectory,
   ratioRange,
   sampleTrajectory,
+  wasmReady,
 } from '../core/api';
 import type { GearboxParams, JointName, RobotConfig } from '../core/config';
 import { parseRobotConfig } from '../core/config';
@@ -286,20 +287,29 @@ export const useTwinStore = create<TwinState>((set, get) => {
     };
   };
 
-  return {
+  const initialState = {
     drives: { ...config.drives },
     gearboxes: { ...config.gearboxes },
     payload: config.masses.payloadDefault,
-    controlMode: 'target',
-    branch: 'elbow-up',
-    target: forwardKinematics(HOME_POSE, config.links).tcp,
+    controlMode: 'target' as ControlMode,
+    branch: 'elbow-up' as IkBranch,
+    target: [0.12, 0.18, 0] as Vec3, // placeholder; updated when WASM ready
     q: HOME_POSE,
-    ikStatus: { kind: 'ok', nearSingularity: false },
-    motion: null,
-    sequence: null,
-    lastMove: null,
-    trace: [],
+    ikStatus: { kind: 'ok' as const, nearSingularity: false },
+    motion: null as Motion | null,
+    sequence: null as SequenceState | null,
+    lastMove: null as MoveReport | null,
+    trace: [] as Vec3[],
     showWorkspace: true,
+  };
+
+  // Initialize target once WASM is ready
+  wasmReady.then(() => {
+    set({ target: forwardKinematics(HOME_POSE, config.links).tcp });
+  });
+
+  return {
+    ...initialState,
 
     setDrive: (joint, patch) =>
       set((s) => {

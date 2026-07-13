@@ -27,15 +27,41 @@ import type { WaypointMode, WaypointParseResult } from './waypoints';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type WasmModule = any;
 
-const wasm: WasmModule = await createRobotTwinModule();
+let wasm: WasmModule;
+let GB_TYPE: Record<GearboxType, unknown>;
+let BRANCH: Record<IkBranch, unknown>;
+let JOINT_ENUMS: readonly [unknown, unknown, unknown];
+
+export const wasmReady = createRobotTwinModule().then((module) => {
+  console.log('WASM module loaded:', typeof module);
+  wasm = module;
+  console.log('WASM module assigned:', typeof wasm);
+  console.log('GearboxType available:', !!wasm.GearboxType);
+
+  // Initialize enum bridges after WASM is ready
+  GB_TYPE = {
+    direct: wasm.GearboxType.Direct,
+    planetary: wasm.GearboxType.Planetary,
+    cycloidal: wasm.GearboxType.Cycloidal,
+  };
+  console.log('GB_TYPE initialized:', typeof GB_TYPE);
+
+  BRANCH = {
+    'elbow-up': wasm.IkBranch.ElbowUp,
+    'elbow-down': wasm.IkBranch.ElbowDown,
+  };
+  console.log('BRANCH initialized:', typeof BRANCH);
+
+  JOINT_ENUMS = [wasm.Joint.Base, wasm.Joint.Shoulder, wasm.Joint.Elbow];
+  console.log('JOINT_ENUMS initialized:', Array.isArray(JOINT_ENUMS));
+
+  return module;
+}).catch((err) => {
+  console.error('WASM initialization failed:', err);
+  throw err;
+});
 
 // ------------------------------------------------------------- enum bridges
-
-const GB_TYPE: Record<GearboxType, unknown> = {
-  direct: wasm.GearboxType.Direct,
-  planetary: wasm.GearboxType.Planetary,
-  cycloidal: wasm.GearboxType.Cycloidal,
-};
 
 function gbTypeName(v: unknown): GearboxType {
   if (v === wasm.GearboxType.Direct) return 'direct';
@@ -43,16 +69,9 @@ function gbTypeName(v: unknown): GearboxType {
   return 'cycloidal';
 }
 
-const BRANCH: Record<IkBranch, unknown> = {
-  'elbow-up': wasm.IkBranch.ElbowUp,
-  'elbow-down': wasm.IkBranch.ElbowDown,
-};
-
 function branchName(v: unknown): IkBranch {
   return v === wasm.IkBranch.ElbowUp ? 'elbow-up' : 'elbow-down';
 }
-
-const JOINT_ENUMS = [wasm.Joint.Base, wasm.Joint.Shoulder, wasm.Joint.Elbow] as const;
 
 function jointNameOf(v: unknown): JointName {
   const i = JOINT_ENUMS.findIndex((j) => j === v);

@@ -223,6 +223,7 @@ EMSCRIPTEN_BINDINGS(robottwin) {
   function("reflectedInertia", &reflectedInertia);
   function("jointResolution", &jointResolution);
   function("deriveGearbox", &deriveGearbox);
+  function("ratioRange", &ratioRange);
 
   function("gravityTorques", &gravityTorques);
   function("planTrajectory", &planTrajectory);

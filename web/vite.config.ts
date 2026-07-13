@@ -10,7 +10,7 @@ export default defineConfig({
     target: 'es2022',
   },
   server: {
-    port: 5173,
+    port: parseInt(process.env.PORT || '5173', 10),
     fs: {
       // allow importing config/robot.yaml from the repo root
       allow: ['..'],

@@ -64,13 +64,13 @@ gearbox_models:
   planetary:
     ratio_range: [2, 25]
     max_stage_ratio: 6
-    stage_efficiency: 0.88
+    stage_efficiency: 0.75
     stage_backlash_deg: 0.6
     max_torque_nm: 3.5       # printed-gear strength cap
     stage_inertia_g_cm2: 12
   cycloidal:
     ratio_range: [8, 40]
-    efficiency: 0.75
+    efficiency: 0.60
     backlash_deg: 0.0        # negligible by design assumption
     max_torque_nm: 8.0
     inertia_g_cm2: 25

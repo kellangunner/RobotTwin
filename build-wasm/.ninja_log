@@ -10,3 +10,5 @@
 14	1002	8056778894079705	librobottwin_core.a	623f8ed2fe593ff5
 32	2060	8056778894247874	CMakeFiles/robottwin_wasm.dir/src/wasm/bindings.cpp.o	839a0181224bcd54
 2061	14214	8056778914563441	C:/Users/kgunner/Documents/GitHub/RobotTwin/web/src/wasm/robottwin.js	3e10b7dec5c1a9d4
+8	1763	8056800164439105	CMakeFiles/robottwin_wasm.dir/src/wasm/bindings.cpp.o	839a0181224bcd54
+1763	4346	8056800182036755	C:/Users/kgunner/Documents/GitHub/RobotTwin/web/src/wasm/robottwin.js	3e10b7dec5c1a9d4
