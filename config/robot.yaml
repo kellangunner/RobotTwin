@@ -75,6 +75,20 @@ gearbox_models:
     max_torque_nm: 8.0
     inertia_g_cm2: 25
 
+# Collision geometry — conservative capsule/sphere envelopes around the real
+# parts. Used to block commands that would self-collide or strike the table.
+collision:
+  ground_clearance_mm: 5      # minimum gap kept between any link and the table
+  column_radius_mm: 34        # rotating column + base motor envelope
+  column_top_mm: 70           # column capsule spans z = 0 .. this
+  base_radius_mm: 78          # stationary base housing envelope
+  base_top_mm: 62
+  shoulder_radius_mm: 42      # shoulder joint + motor block envelope
+  upper_arm_radius_mm: 26
+  forearm_radius_mm: 22
+  gripper_extent_mm: 32       # gripper reach beyond the TCP along the forearm
+  elbow_trim: 0.2             # forearm fraction ignored next to its own elbow joint
+
 # Standard mechanical components the design is built around
 hardware:
   bearing: "608 (8x22x7 mm)"

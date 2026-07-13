@@ -2,7 +2,7 @@
 // choices on the left. Recomputed from core/ on every relevant state change.
 
 import { useMemo } from 'react';
-import { computeMetrics } from '../core/metrics';
+import { computeMetrics } from '../core/api';
 import { m2mm, rad2deg } from '../core/units';
 import { config, useTwinStore } from '../state/store';
 import { Panel } from './controls';
@@ -29,6 +29,7 @@ export function MetricsPanel() {
   const q = useTwinStore((s) => s.q);
   const lastMove = useTwinStore((s) => s.lastMove);
   const motion = useTwinStore((s) => s.motion);
+  const sequence = useTwinStore((s) => s.sequence);
 
   const metrics = useMemo(
     () => computeMetrics(config, gearboxes, q, payload),
@@ -80,12 +81,18 @@ export function MetricsPanel() {
       </Panel>
 
       <Panel title="Last move">
+        {sequence && (
+          <p className="mb-1 text-xs text-sky-300">
+            waypoint {Math.min(sequence.index, sequence.targets.length)}/{sequence.targets.length}
+            {motion ? '' : ' — holding'}
+          </p>
+        )}
         {motion && (
           <p className="text-xs text-sky-300">
             moving… {(motion.elapsed).toFixed(1)} / {motion.plan.duration.toFixed(1)} s
           </p>
         )}
-        {!motion && lastMove && (
+        {!motion && !sequence && lastMove && (
           <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
             <dt className="text-slate-400">Duration</dt>
             <dd className="text-right tabular-nums text-slate-100">
@@ -111,7 +118,9 @@ export function MetricsPanel() {
             )}
           </dl>
         )}
-        {!motion && !lastMove && <p className="text-xs text-slate-500">no moves yet</p>}
+        {!motion && !sequence && !lastMove && (
+          <p className="text-xs text-slate-500">no moves yet</p>
+        )}
       </Panel>
     </div>
   );

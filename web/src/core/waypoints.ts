@@ -3,6 +3,7 @@
 // targets. Cartesian rows go through the analytical IK, chaining branch
 // selection from the previous waypoint so the arm doesn't flip mid-sequence.
 
+import { checkPose } from './collision';
 import type { RobotConfig } from './config';
 import { JOINT_NAMES } from './config';
 import type { IkBranch, JointAngles } from './kinematics';
@@ -61,14 +62,27 @@ export function parseWaypointCsv(
         issue(`line ${idx + 1}: ${bad} out of limits`);
         return;
       }
+      const pose = checkPose(q, config.links, config.collision);
+      if (pose.colliding) {
+        issue(`line ${idx + 1}: ${pose.issues[0]}`);
+        return;
+      }
       targets.push(q);
       prevQ = q;
     } else {
       const p = nums.map(mm2m) as [number, number, number];
       const res = inverseKinematics(p, config.links, config.limits);
-      const usable = res.reachable ? res.solutions.filter((s) => s.withinLimits) : [];
-      if (usable.length === 0) {
+      const withinLimits = res.reachable ? res.solutions.filter((s) => s.withinLimits) : [];
+      if (withinLimits.length === 0) {
         issue(`line ${idx + 1}: unreachable or outside joint limits`);
+        return;
+      }
+      const usable = withinLimits.filter(
+        (s) => !checkPose(s.q, config.links, config.collision).colliding,
+      );
+      if (usable.length === 0) {
+        const { issues } = checkPose(withinLimits[0].q, config.links, config.collision);
+        issue(`line ${idx + 1}: ${issues[0] ?? 'pose collides'}`);
         return;
       }
       const preferred = usable.filter((s) => s.branch === branch);

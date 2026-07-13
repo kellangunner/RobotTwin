@@ -7,6 +7,7 @@ import {
   maxJointSpeed,
   motorTorqueAtSpeed,
   reflectedInertia,
+  torqueLimitedSpeed,
 } from './drivetrain';
 import { gravityTorques } from './dynamics';
 import { planTrajectory, sampleTrajectory } from './trajectory';
@@ -61,6 +62,46 @@ describe('gearbox model', () => {
 
   it('improves joint resolution by the ratio', () => {
     expect(jointResolution(motor, gb({ ratio: 5 }))).toBeCloseTo(deg2rad(1.8) / 16 / 5);
+  });
+});
+
+describe('torque-limited speed', () => {
+  it('returns 0 when standstill torque cannot meet the requirement (hold failure)', () => {
+    // standstill joint torque = 0.45 * 5 * 0.85 = 1.9125 N·m
+    const speed = torqueLimitedSpeed(motor, gb(), 2.0);
+    expect(speed).toBe(0);
+  });
+
+  it('returns full kinematic speed when no torque is required', () => {
+    const speed = torqueLimitedSpeed(motor, gb(), 0);
+    expect(speed).toBeCloseTo(maxJointSpeed(motor, gb()));
+  });
+
+  it('returns an intermediate speed for a typical gravity load', () => {
+    // ~1.17 N·m shoulder torque at horizontal extension
+    const requiredTorque = 1.17;
+    const speed = torqueLimitedSpeed(motor, gb(), requiredTorque);
+    expect(speed).toBeGreaterThan(0);
+    expect(speed).toBeLessThan(maxJointSpeed(motor, gb()));
+    // At this speed, the motor must still be able to produce the required torque
+    const actualTorque = availableJointTorque(motor, gb(), speed);
+    expect(actualTorque).toBeGreaterThanOrEqual(requiredTorque - 0.001);
+  });
+
+  it('higher gear ratio gives more torque headroom → higher safe speed', () => {
+    const requiredTorque = 1.0;
+    const speedLow = torqueLimitedSpeed(motor, gb({ ratio: 3 }), requiredTorque);
+    const speedHigh = torqueLimitedSpeed(motor, gb({ ratio: 10 }), requiredTorque);
+    // The higher ratio has more torque headroom relative to kinematic ceiling,
+    // but lower absolute kinematic ceiling; the torque-limited fraction is larger.
+    const fractionLow = speedLow / maxJointSpeed(motor, gb({ ratio: 3 }));
+    const fractionHigh = speedHigh / maxJointSpeed(motor, gb({ ratio: 10 }));
+    expect(fractionHigh).toBeGreaterThan(fractionLow);
+  });
+
+  it('returns 0 when gearbox maxTorque is below required', () => {
+    const speed = torqueLimitedSpeed(motor, gb({ maxTorque: 0.5 }), 0.6);
+    expect(speed).toBe(0);
   });
 });
 

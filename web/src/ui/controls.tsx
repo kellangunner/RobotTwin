@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 export function Panel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-slate-800 bg-slate-900/70 p-3">
+    <section className="overflow-hidden rounded-lg border border-slate-800 bg-slate-900/70 p-3">
       <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
         {title}
       </h2>

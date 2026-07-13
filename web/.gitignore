@@ -1,3 +1,7 @@
 node_modules/
 dist/
 *.local
+
+# Emscripten build artifacts (produced by `cmake --build build-wasm` at repo root)
+src/wasm/robottwin.js
+src/wasm/robottwin.wasm

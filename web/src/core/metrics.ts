@@ -11,6 +11,7 @@ import {
   maxJointSpeed,
   maxTcpSpeed,
   reflectedInertia,
+  torqueLimitedSpeed,
 } from './drivetrain';
 import { gravityTorques, worstCaseLinkInertia } from './dynamics';
 import type { JointAngles } from './kinematics';
@@ -42,6 +43,12 @@ export interface TwinMetrics {
 
 /** Fraction of the static torque budget reserved for acceleration. */
 const ACCEL_TORQUE_FRACTION = 0.7;
+
+/**
+ * Safety margin applied to the torque-limited speed ceiling.
+ * Keeps the planner away from the exact stall boundary.
+ */
+const SPEED_SAFETY_MARGIN = 0.85;
 
 export interface TrajectoryAudit {
   peakUtilization: number; // worst required/available torque ratio over the move
@@ -99,14 +106,29 @@ export function computeMetrics(
     const required = Math.abs(tauGrav[i]);
     const refl = reflectedInertia(motor, gb);
     const totalInertia = refl + linkInertias[i];
-    const budget = ACCEL_TORQUE_FRACTION * (available - required);
+
+    // --- Torque-safe speed ceiling ---
+    // The kinematic ceiling (motor RPM / ratio) ignores torque drop-off.
+    // torqueLimitedSpeed gives the fastest the joint can spin while still
+    // producing enough torque to hold against gravity.
+    const kinematicSpeed = maxJointSpeed(motor, gb);
+    const safeSpeed = torqueLimitedSpeed(motor, gb, required) * SPEED_SAFETY_MARGIN;
+    const effectiveSpeed = Math.min(kinematicSpeed, safeSpeed);
+
+    // --- Torque-aware acceleration budget ---
+    // Use torque available at half the safe speed (a conservative mid-move
+    // estimate) instead of standstill torque, which overstates the budget.
+    const midMoveSpeed = effectiveSpeed / 2;
+    const availableAtMidSpeed = availableJointTorque(motor, gb, midMoveSpeed);
+    const accelBudget = ACCEL_TORQUE_FRACTION * (availableAtMidSpeed - required);
+
     return {
       name,
       availableTorque: available,
       requiredTorque: required,
       utilization: available > 1e-9 ? required / available : Infinity,
-      maxSpeed: maxJointSpeed(motor, gb),
-      maxAccel: Math.max(0, budget / totalInertia),
+      maxSpeed: effectiveSpeed,
+      maxAccel: Math.max(0, accelBudget / totalInertia),
       reflectedInertia: refl,
       linkInertia: linkInertias[i],
       resolution: jointResolution(motor, gb),

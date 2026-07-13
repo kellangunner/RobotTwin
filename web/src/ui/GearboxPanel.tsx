@@ -5,7 +5,7 @@
 
 import type { GearboxType, JointName } from '../core/config';
 import { JOINT_NAMES } from '../core/config';
-import { deriveGearbox, ratioRange } from '../core/gearboxModel';
+import { deriveGearbox, ratioRange } from '../core/api';
 import { rad2deg } from '../core/units';
 import { config, useTwinStore } from '../state/store';
 import { Chip, Panel, Slider } from './controls';

@@ -2,6 +2,7 @@
 // The YAML uses human units; everything in RobotConfig is SI.
 
 import { load } from 'js-yaml';
+import type { CollisionModel } from './collision';
 import type { DriveSelection, GearboxModels } from './gearboxModel';
 import { deriveGearbox } from './gearboxModel';
 import { deg2rad, g2kg, gcm2_to_kgm2, mm2m, rpm2radps } from './units';
@@ -60,6 +61,8 @@ export interface RobotConfig {
   drives: Record<JointName, DriveSelection>;
   /** Full characteristics derived from drives via gearboxModels. */
   gearboxes: Record<JointName, GearboxParams>;
+  /** Capsule/sphere envelopes for self- and ground-collision checks. */
+  collision: CollisionModel;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -140,5 +143,17 @@ export function parseRobotConfig(yamlText: string): RobotConfig {
     gearboxModels,
     drives,
     gearboxes,
+    collision: {
+      groundClearance: mm2m(raw.collision.ground_clearance_mm),
+      columnRadius: mm2m(raw.collision.column_radius_mm),
+      columnTop: mm2m(raw.collision.column_top_mm),
+      baseRadius: mm2m(raw.collision.base_radius_mm),
+      baseTop: mm2m(raw.collision.base_top_mm),
+      shoulderRadius: mm2m(raw.collision.shoulder_radius_mm),
+      upperArmRadius: mm2m(raw.collision.upper_arm_radius_mm),
+      forearmRadius: mm2m(raw.collision.forearm_radius_mm),
+      gripperExtent: mm2m(raw.collision.gripper_extent_mm),
+      elbowTrim: raw.collision.elbow_trim,
+    },
   };
 }

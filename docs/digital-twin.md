@@ -39,9 +39,10 @@ web/src/
 ```
 
 The layering enforces the project rule that visualization is independent of robot math:
-`three/` and `ui/` import from `state/` and `core/`, never the reverse. When the C++ core
-is compiled to WebAssembly (Phase 3 goal), `core/` is the module it replaces — the store and
-views are written against its function signatures.
+`three/` and `ui/` import from `state/` and `core/`, never the reverse. The C++20 reference
+implementation of every `core/` module now lives in [`src/`](cpp-core.md); both test suites
+assert the same numeric fixtures, and the remaining Phase 3 step is compiling it with emsdk
+and swapping the store's imports to the WASM module.
 
 ## Algorithms & equations
 
@@ -74,6 +75,19 @@ efficient, **negligible backlash by design assumption**, highest printed-torque 
 limits. Every planned move gets a **predictive audit**: 120 dense samples comparing
 `|τ_gravity| + I_total·|q̈|` against the speed-derated available torque; a peak over 100 %
 means an open-loop stepper would skip steps.
+
+**Collision detection** (`core/collision.ts`, envelopes in `config/robot.yaml` `collision`) —
+conservative envelopes: forearm+gripper capsule vs the ground plane, vs flat-topped cylinders
+for the base housing and rotating column (a capsule would dome a squat cylinder's top by its
+full radius — far too conservative), and vs a shoulder-joint sphere for deep elbow folds (the
+forearm capsule is trimmed near its own elbow, where adjacent links legitimately meet). Every
+command path is gated: IK drops colliding branches, joint-slider commands are refused, planned
+trajectories are sampled densely pose-by-pose before executing (endpoints being safe does not
+make the sweep safe), and CSV waypoints are validated row-by-row with per-line reasons.
+
+**Waypoint sequences** — a CSV of rows interpreted per the active tab (`x,y,z` mm via IK with
+branch continuity, or `θ1,θ2,θ3` deg) runs as a chain of quintic legs with a 0.8 s dwell at
+each waypoint; the final report aggregates the worst torque utilization across all legs.
 
 ## Assumptions & limitations
 

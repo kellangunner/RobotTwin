@@ -1,0 +1,12 @@
+# ninja log v7
+84	9555	8056778549100791	CMakeFiles/robottwin_core.dir/src/planning/trajectory.cpp.o	500e790f770f1016
+66	9573	8056778548946491	CMakeFiles/robottwin_core.dir/src/drivetrain/gearbox_model.cpp.o	7116d171dc0776f
+75	9576	8056778548996942	CMakeFiles/robottwin_core.dir/src/dynamics/dynamics.cpp.o	e81183e9c45b3a84
+56	10708	8056778548840208	CMakeFiles/robottwin_core.dir/src/drivetrain/drivetrain.cpp.o	3063fe9e05e4658
+91	10713	8056778549100791	CMakeFiles/robottwin_core.dir/src/simulation/metrics.cpp.o	52bc2481e7788870
+105	10756	8056778549327152	CMakeFiles/robottwin_core.dir/src/geometry/collision.cpp.o	7f0a89750443152f
+4	10880	8056778548282825	CMakeFiles/robottwin_core.dir/src/kinematics/kinematics.cpp.o	1e64b3bf5bd14031
+116	12801	8056778549430599	CMakeFiles/robottwin_core.dir/src/io/waypoints.cpp.o	a7b33694405195af
+14	1002	8056778894079705	librobottwin_core.a	623f8ed2fe593ff5
+32	2060	8056778894247874	CMakeFiles/robottwin_wasm.dir/src/wasm/bindings.cpp.o	839a0181224bcd54
+2061	14214	8056778914563441	C:/Users/kgunner/Documents/GitHub/RobotTwin/web/src/wasm/robottwin.js	3e10b7dec5c1a9d4

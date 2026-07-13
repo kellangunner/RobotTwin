@@ -34,6 +34,46 @@ export function maxJointSpeed(motor: MotorParams, gb: GearboxParams): number {
   return motor.maxSpeed / gb.ratio;
 }
 
+/**
+ * Maximum joint speed (rad/s) at which the drivetrain can still produce at
+ * least `requiredTorque` N·m at the joint output.  Returns 0 when even
+ * standstill torque can't meet the requirement (hold failure).
+ *
+ * Derived from the linear stepper torque-speed model:
+ *   τ_motor(ω) = holdingTorque × (1 − ω/ωmax)
+ *   τ_joint    = τ_motor × ratio × η,  capped at gb.maxTorque
+ *
+ * Solving τ_joint ≥ required for ω_joint:
+ *   ω_joint ≤ (ωmax / ratio) × (1 − required / (holdingTorque × ratio × η))
+ *
+ * The result is further clamped so it never exceeds the gear-cap-limited
+ * speed (the speed at which gearbox maxTorque equals the motor's output).
+ */
+export function torqueLimitedSpeed(
+  motor: MotorParams,
+  gb: GearboxParams,
+  requiredTorque: number,
+): number {
+  const standstillJointTorque = motor.holdingTorque * gb.ratio * gb.efficiency;
+  // If even standstill can't meet the requirement, no safe speed exists.
+  if (standstillJointTorque <= requiredTorque) return 0;
+  // Also respect the printed-gear strength cap.
+  if (gb.maxTorque <= requiredTorque) return 0;
+
+  // Speed at which the motor-side torque, after reduction, equals required.
+  const fraction = 1 - requiredTorque / standstillJointTorque;
+  const speedFromMotor = (motor.maxSpeed / gb.ratio) * fraction;
+
+  // Speed at which the gearbox hits its own torque cap (printed-gear limit).
+  // τ_motor(ω) × ratio × η = maxTorque  →  ω_motor = ωmax × (1 − maxTorque/(hold×ratio×η))
+  const gearCapFraction = 1 - gb.maxTorque / standstillJointTorque;
+  const speedFromGearCap = gearCapFraction > 0
+    ? (motor.maxSpeed / gb.ratio) * gearCapFraction
+    : motor.maxSpeed / gb.ratio; // gear cap is above motor capability → not binding
+
+  return Math.max(0, Math.min(speedFromMotor, speedFromGearCap));
+}
+
 /** Rotor + gearbox input inertia reflected to the joint side (kg·m²). */
 export function reflectedInertia(motor: MotorParams, gb: GearboxParams): number {
   return (motor.rotorInertia + gb.inertia) * gb.ratio * gb.ratio;

@@ -1,0 +1,4 @@
+C:/Users/kgunner/Documents/GitHub/RobotTwin/build-wasm/CMakeFiles/robottwin_core.dir
+C:/Users/kgunner/Documents/GitHub/RobotTwin/build-wasm/CMakeFiles/robottwin_wasm.dir
+C:/Users/kgunner/Documents/GitHub/RobotTwin/build-wasm/CMakeFiles/edit_cache.dir
+C:/Users/kgunner/Documents/GitHub/RobotTwin/build-wasm/CMakeFiles/rebuild_cache.dir

@@ -4,7 +4,7 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import { config, useTwinStore } from '../state/store';
-import { workspaceBoundary } from '../core/kinematics';
+import { workspaceBoundary } from '../core/api';
 
 export function WorkspaceShell() {
   const show = useTwinStore((s) => s.showWorkspace);

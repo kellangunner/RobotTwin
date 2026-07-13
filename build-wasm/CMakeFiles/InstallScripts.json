@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/kgunner/Documents/GitHub/RobotTwin/build-wasm/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

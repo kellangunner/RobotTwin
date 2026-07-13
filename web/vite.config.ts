@@ -5,6 +5,10 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    // top-level await in core/api.ts (WASM module init)
+    target: 'es2022',
+  },
   server: {
     port: 5173,
     fs: {
