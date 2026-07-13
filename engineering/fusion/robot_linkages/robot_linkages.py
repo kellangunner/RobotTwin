@@ -3,10 +3,13 @@
 Generates the four printed structural members of the 3-DOF arm and exports
 them to engineering/f3d, engineering/step, and engineering/stl:
 
-    rt_base_pan     — stationary base, direct-drive NEMA 17 mount inside
-    rt_yaw_column   — theta-1 output: motor-shaft hub + shoulder clevis + drum
-    rt_upper_arm    — shoulder hub -> elbow clevis + elbow gearbox drum
-    rt_forearm      — elbow hub -> gripper interface plate (T8 nut pattern)
+    rt_base_pan        — stationary base: NEMA 17 mount + yaw bearing boss
+    rt_shaft_coupling  — printed split-clamp hub: 5 mm D-shaft -> 6805 journal
+    rt_yaw_column      — theta-1 output: bolts onto the coupling, shoulder clevis
+    rt_upper_arm       — shoulder hub -> elbow clevis + elbow gearbox drum
+    rt_forearm         — elbow hub -> gripper interface plate (T8 nut pattern)
+
+Each part exports its own STEP and STL; the f3d archive holds the assembly.
 
 Link lengths come from config/robot.yaml (single source of truth); all
 hardware dimensions are named constants below. Cycloidal gearboxes are OUT OF
@@ -86,10 +89,29 @@ NEMA_HOLE_SPACING = 31.0
 NEMA_PILOT_D = 22.5         # 22 mm pilot boss + clearance
 NEMA_SHAFT_LEN = 22.0       # usable shaft above the mounting face
 
-# 5 mm flange shaft hub (couples the base motor shaft to the yaw column):
-# Ø22 body, 4 x M3 flange holes on a Ø16 bolt circle, set-screwed to the shaft
+# Printed split-clamp coupling (rt_shaft_coupling): clamps the motor's 5 mm
+# D-shaft, carries the yaw support bearing on its Ø25 journal, and bolts to
+# the column hub through its top flange (M3 screws from above into heat-set
+# inserts in the flange). A standard part with its own STEP export.
 COUPLING_BCD = 16.0
+COUPLING_BORE_D = 5.2
+COUPLING_FLAT_X = 2.05       # D-flat plane offset (NEMA 17 flat: 4.5 across)
+COUPLING_CLAMP_D = 26.0
+COUPLING_CLAMP_H = 9.5
+COUPLING_FLANGE_D = 30.0     # covers the bearing inner race (r<=15), clears outer
+COUPLING_FLANGE_T = 3.0
 COUPLING_TIP_CLEAR_D = 10.0  # bore over the shaft tip inside the column hub
+
+# Yaw support bearing: 6805-2RS (25 x 37 x 7) between the coupling journal
+# and a boss on the pan. Takes the arm's weight and, paired with the motor's
+# front bearing ~17 mm below, the overturning moment off the bare shaft.
+YAW_BRG_ID = 25.0            # = coupling journal diameter
+YAW_BRG_OD = 37.0
+YAW_BRG_W = 7.0
+YAW_POCKET_D = YAW_BRG_OD + 0.3
+BOSS_OD = 44.0               # stays inside the shoulder drum's r=25.75 sweep
+BOSS_ID = 34.0               # clears the rotating clamp body (Ø26)
+BOSS_LEG_H = 5.0             # legs straddle the motor screw heads
 
 # Reserved cycloidal gearbox envelope at the pitch joints. Sized so the drum
 # (envelope + wall) swings clear of the base pan: drum radius 38 => lowest
@@ -138,6 +160,15 @@ WIRE_HOLE_D = 12.0
 # The motor face must land exactly on the underside of the web: the body
 # spans table (z=0) to face (z=48) through the floor opening.
 assert PAN_H - PAN_WEB_T == NEMA_LEN, 'pan height must equal motor length + web'
+
+# Derived z-planes of the base joint stack (bottom to top): motor face, then
+# the coupling's clamp / bearing journal / flange, then the column hub.
+MOTOR_FACE_Z = PAN_H - PAN_WEB_T
+CLAMP_Z0 = MOTOR_FACE_Z + 0.5          # running clearance over the web
+JOURNAL_Z0 = CLAMP_Z0 + COUPLING_CLAMP_H
+FLANGE_Z0 = JOURNAL_Z0 + YAW_BRG_W     # flange presses the inner race top
+COUPLING_TOP = FLANGE_Z0 + COUPLING_FLANGE_T
+assert JOURNAL_Z0 == PAN_H + BOSS_LEG_H + 3.0, 'bearing seat must meet journal'
 
 # Yaw column hub: bolts onto the flange shaft hub at the motor shaft tip
 COL_HUB_D = 68.0
@@ -322,16 +353,71 @@ def build_base_pan(pan_h):
     # wire exit through the side wall
     b.cut(b.cyl((PAN_D / 2 - PAN_WALL - 2, 0, PAN_FLOOR_T + WIRE_HOLE_D / 2 + 2),
                 (PAN_D / 2 + 2, 0, PAN_FLOOR_T + WIRE_HOLE_D / 2 + 2), WIRE_HOLE_D))
+
+    # --- yaw support bearing boss ---
+    # Four legs at the cardinal azimuths (the motor screws sit at 45°) carry a
+    # ring with the 6805 pocket. Bearing loads pass legs -> 2 mm web -> the
+    # motor's steel face in compression, straight down the body to the table.
+    ring_z0 = pan_h + BOSS_LEG_H
+    pocket_top = JOURNAL_Z0 + YAW_BRG_W + 0.4
+    for x0, x1, y0, y1 in ((16, 24, -5, 5), (-24, -16, -5, 5),
+                           (-5, 5, 16, 24), (-5, 5, -24, -16)):
+        b.add(b.box(x0, x1, y0, y1, pan_h, ring_z0))
+    b.add(b.cyl((0, 0, ring_z0), (0, 0, pocket_top), BOSS_OD))
+    # interior: clearance over the rotating clamp, then the bearing pocket
+    # (the ID step at JOURNAL_Z0 is the shoulder the outer race sits on)
+    b.cut(b.cyl((0, 0, ring_z0 - 0.1), (0, 0, JOURNAL_Z0), BOSS_ID))
+    b.cut(b.cyl((0, 0, JOURNAL_Z0), (0, 0, pocket_top + 1), YAW_POCKET_D))
+    # driver-access notches over the four motor screws (the bearing's outer
+    # race still seats on the four arcs left between them)
+    h = NEMA_HOLE_SPACING / 2
+    for dx, dy in ((h, h), (h, -h), (-h, h), (-h, -h)):
+        b.cut(b.cyl((dx, dy, pan_h - 0.1), (dx, dy, pocket_top + 1), 9.0))
     return b.body
 
 
-def build_yaw_column(pan_h, shoulder_z):
-    """Theta-1 output, direct-driven: the hub disc bolts onto a 5 mm flange
-    shaft hub set-screwed to the base motor's shaft (M3 screws from below
-    into heat-set inserts in the hub). Clevis ears rise to the shoulder axis;
-    the reserved shoulder gearbox drum hangs on the -Y ear."""
+def build_shaft_coupling():
+    """rt_shaft_coupling — printable standard part replacing a set-screw
+    flange hub. Bottom-up: split clamp on the motor's 5 mm D-shaft (slit +
+    two M3 cross-bolts with captured nuts), Ø25 journal the 6805 rides on,
+    Ø30 flange with 4 heat-set inserts the column bolts down into. The D-bore
+    gives positive torque drive; the clamp carries none of the arm's weight —
+    that goes flange -> bearing -> pan boss."""
     b = Builder()
-    hub_z0 = (pan_h - PAN_WEB_T) + NEMA_SHAFT_LEN  # hub bottom = shaft tip
+    b.add(b.cyl((0, 0, CLAMP_Z0), (0, 0, JOURNAL_Z0), COUPLING_CLAMP_D))
+    b.add(b.cyl((0, 0, JOURNAL_Z0), (0, 0, FLANGE_Z0), YAW_BRG_ID))
+    b.add(b.cyl((0, 0, FLANGE_Z0), (0, 0, COUPLING_TOP), COUPLING_FLANGE_D))
+    # D-bore: round bore minus the flat — shape the tool before cutting
+    bore = b.cyl((0, 0, CLAMP_Z0 - 1), (0, 0, COUPLING_TOP + 1), COUPLING_BORE_D)
+    flat = b.box(COUPLING_FLAT_X, COUPLING_BORE_D, -COUPLING_BORE_D,
+                 COUPLING_BORE_D, CLAMP_Z0 - 1, COUPLING_TOP + 1)
+    b.tbm.booleanOperation(bore, flat,
+                           adsk.fusion.BooleanTypes.DifferenceBooleanType)
+    b.cut(bore)
+    # clamp slit through the +X side of the clamp section only
+    b.cut(b.box(0, COUPLING_CLAMP_D, -1, 1, CLAMP_Z0 - 1, JOURNAL_Z0 - 0.5))
+    # two M3 cross-bolts squeeze the slit: clearance hole through, captured
+    # square nut pocket on -Y, spot-face for the head on +Y
+    for dz in (3.0, 7.0):
+        z = CLAMP_Z0 + dz
+        b.cut(b.cyl((7.5, -14, z), (7.5, 14, z), M3_CLEAR_D))
+        b.cut(b.box(7.5 - 3.2, 7.5 + 3.2, -11, -7, z - 2.9, z + 2.9))
+        b.cut(b.cyl((7.5, 9.5, z), (7.5, 14, z), 6.5))
+    # column-hub inserts in the flange top (pockets reach into the journal)
+    b.cut_bolt_circle_z(0, 0, COUPLING_BCD, 4, INSERT_D,
+                        COUPLING_TOP - INSERT_POCKET, COUPLING_TOP + 1,
+                        clock_deg=45)
+    return b.body
+
+
+def build_yaw_column(pan_h, shoulder_z):  # noqa: ARG001 — stack derives from constants
+    """Theta-1 output, direct-driven: the hub bolts down onto the printed
+    split-clamp coupling (M3 screws from above, through counterbored holes,
+    into the coupling's heat-set inserts). The 6805 under the flange carries
+    the arm's weight and moment. Clevis ears rise to the shoulder axis; the
+    reserved shoulder gearbox drum hangs on the -Y ear."""
+    b = Builder()
+    hub_z0 = COUPLING_TOP
     hub_z1 = hub_z0 + COL_HUB_T
     ear_z0 = hub_z1 - 6.5                      # ears root into the hub disc
     b.add(b.cyl((0, 0, hub_z0), (0, 0, hub_z1), COL_HUB_D))
@@ -339,11 +425,13 @@ def build_yaw_column(pan_h, shoulder_z):
         b.add(b.box(-EAR_BOSS_D / 2, EAR_BOSS_D / 2,
                     s * EAR_IN, s * EAR_OUT, ear_z0, shoulder_z))
     add_clevis_bosses(b, 0, shoulder_z, drive_side=-1)
-    # coupling interface in the hub's underside: clearance over the shaft tip
-    # plus 4 x M3 insert pockets on the flange hub's bolt circle
+    # coupling interface: shaft-tip clearance + 4 x M3 counterbored through
+    # holes (heads accessible from above, between the ears)
     b.cut(b.cyl((0, 0, hub_z0 - 1), (0, 0, hub_z0 + 6), COUPLING_TIP_CLEAR_D))
-    b.cut_bolt_circle_z(0, 0, COUPLING_BCD, 4, INSERT_D,
-                        hub_z0 - 1, hub_z0 + INSERT_POCKET, clock_deg=45)
+    b.cut_bolt_circle_z(0, 0, COUPLING_BCD, 4, M3_CLEAR_D,
+                        hub_z0 - 1, hub_z1 + 1, clock_deg=45)
+    b.cut_bolt_circle_z(0, 0, COUPLING_BCD, 4, 6.5,
+                        hub_z1 - 4, hub_z1 + 1, clock_deg=45)
     cut_bearing_bores(b, 0, shoulder_z)
     add_gearbox_drum(b, 0, shoulder_z)
     return b.body
@@ -418,6 +506,7 @@ def run(context):  # noqa: ARG001 — Fusion entry point signature
 
         parts = {
             'rt_base_pan': build_base_pan(PAN_H),
+            'rt_shaft_coupling': build_shaft_coupling(),
             'rt_yaw_column': build_yaw_column(PAN_H, shoulder_z),
             'rt_upper_arm': build_upper_arm(shoulder_z, l_upper),
             'rt_forearm': build_forearm(shoulder_z, l_upper, l_fore),
@@ -458,11 +547,12 @@ def run(context):  # noqa: ARG001 — Fusion entry point signature
         try_export(os.path.basename(f3d_path),
                    mgr.createFusionArchiveExportOptions(f3d_path))
 
-        step_path = os.path.join(eng_dir, 'step', 'rt-arm-3dof_linkages.step')
-        try_export(os.path.basename(step_path),
-                   mgr.createSTEPExportOptions(step_path))
-
+        # one STEP and one STL per part — no combined jumble
         for name, occ in occurrences.items():
+            step_path = os.path.join(eng_dir, 'step', f'{name}.step')
+            try_export(os.path.basename(step_path),
+                       mgr.createSTEPExportOptions(step_path, occ.component))
+
             stl_path = os.path.join(eng_dir, 'stl', f'{name}.stl')
             opts = mgr.createSTLExportOptions(occ, stl_path)
             opts.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
