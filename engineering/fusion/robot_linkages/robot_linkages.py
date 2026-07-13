@@ -558,6 +558,15 @@ def run(context):  # noqa: ARG001 — Fusion entry point signature
             opts.meshRefinement = adsk.fusion.MeshRefinementSettings.MeshRefinementHigh
             try_export(os.path.basename(stl_path), opts)
 
+        # the coupling is a reusable standard part — also file it with the
+        # purchased-hardware STEPs in engineering/standard parts/
+        std_dir = os.path.join(eng_dir, 'standard parts')
+        if os.path.isdir(std_dir):
+            path = os.path.join(std_dir, 'rt_shaft_coupling.step')
+            try_export('standard parts/rt_shaft_coupling.step',
+                       mgr.createSTEPExportOptions(
+                           path, occurrences['rt_shaft_coupling'].component))
+
         app.activeViewport.fit()
 
         lines = [
