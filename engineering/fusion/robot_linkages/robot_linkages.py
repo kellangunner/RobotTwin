@@ -377,8 +377,9 @@ def run(context):  # noqa: ARG001 — Fusion entry point signature
         design = adsk.fusion.Design.cast(app.activeProduct)
         # Direct modeling: this script is the parametric layer; re-run to rebuild.
         design.designType = adsk.fusion.DesignTypes.DirectDesignType
+        # NB: the root component name follows the document name and cannot be
+        # set on an unsaved document; part names live on the child components.
         root = design.rootComponent
-        root.name = 'rt-arm-3dof linkages'
 
         parts = {
             'rt_base_pan': build_base_pan(PAN_H),
