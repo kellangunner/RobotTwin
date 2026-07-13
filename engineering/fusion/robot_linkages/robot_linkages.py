@@ -3,15 +3,20 @@
 Generates the four printed structural members of the 3-DOF arm and exports
 them to engineering/f3d, engineering/step, and engineering/stl:
 
-    rt_base_pan     — stationary base housing (reserves the base drive bay)
-    rt_yaw_column   — theta-1 output: yaw hub + shoulder clevis + gearbox drum
+    rt_base_pan     — stationary base, direct-drive NEMA 17 mount inside
+    rt_yaw_column   — theta-1 output: motor-shaft hub + shoulder clevis + drum
     rt_upper_arm    — shoulder hub -> elbow clevis + elbow gearbox drum
     rt_forearm      — elbow hub -> gripper interface plate (T8 nut pattern)
 
 Link lengths come from config/robot.yaml (single source of truth); all
 hardware dimensions are named constants below. Cycloidal gearboxes are OUT OF
-SCOPE here — each joint reserves a cylindrical envelope (drum) for one, plus a
-NEMA 17 mount on the drum's back wall.
+SCOPE here — each pitch joint reserves a cylindrical envelope (drum) for one,
+plus a NEMA 17 mount on the drum's back wall. The base is DIRECT-DRIVEN by a
+vertical NEMA 17 (no gearbox): the yaw axis fights no gravity torque.
+
+Fasteners are M3 throughout; wherever parts bolt to a printed member, the
+member carries Ø4.6 pockets for M3 heat-set inserts (screws into a motor's
+own threads get plain clearance).
 
 Load path (per docs/linkage-geometry.md): 608 bearings in the clevis ears
 carry all structural loads; the 8 mm hardened shaft transmits torque from the
@@ -58,21 +63,33 @@ BRG_RETAIN_D = 16.0         # inner shoulder: retains outer race, clears inner
 SHAFT_D = 8.0
 SHAFT_BORE_D = SHAFT_D + 0.4  # printed clearance bore in hubs
 
-# 8 mm shaft collar (set-screw type, ~18 OD x 9 W) — axial retention
-COLLAR_RECESS_D = 20.0
-COLLAR_RECESS_DEPTH = 9.5
+# 8 mm shaft collars (set-screw type, ~18 OD x 9 W) retain the pitch-joint
+# shafts; they sit exposed outboard of the ears (no printed recess needed).
 
 # T8 trapezoidal lead-screw nut (gripper actuation, mounts on forearm tip)
 T8_BORE_D = 10.5            # nut body 10.2 + clearance
 T8_FLANGE_D = 22.5          # nut flange 22 + clearance
 T8_FLANGE_T = 3.6
-T8_BCD = 16.0               # 4 x M3 flange holes
-T8_HOLE_D = 3.5
+T8_BCD = 16.0               # 4 x M3 flange holes -> heat-set inserts
 
-# NEMA 17 (42.3 sq, 31 mm bolt square) — mounts on each gearbox drum back wall
+# Fasteners: M3 everywhere. Where two printed/purchased parts join, the
+# receiving printed part gets an M3 heat-set insert (pocket Ø4.6 x 6.5);
+# screws into a motor's own threaded holes just get clearance.
+M3_CLEAR_D = 3.4
+INSERT_D = 4.6              # M3 x 5.7 heat-set insert pocket diameter
+INSERT_POCKET = 6.5         # pocket depth (insert length 5.7 + melt room)
+
+# NEMA 17 (42.3 sq x 48, 31 mm bolt square, 5 mm D-shaft)
+NEMA_SQ = 42.3
+NEMA_LEN = 48.0
 NEMA_HOLE_SPACING = 31.0
-NEMA_HOLE_D = 3.2           # M3 clearance
 NEMA_PILOT_D = 22.5         # 22 mm pilot boss + clearance
+NEMA_SHAFT_LEN = 22.0       # usable shaft above the mounting face
+
+# 5 mm flange shaft hub (couples the base motor shaft to the yaw column):
+# Ø22 body, 4 x M3 flange holes on a Ø16 bolt circle, set-screwed to the shaft
+COUPLING_BCD = 16.0
+COUPLING_TIP_CLEAR_D = 10.0  # bore over the shaft tip inside the column hub
 
 # Reserved cycloidal gearbox envelope at the pitch joints. Sized so the drum
 # (envelope + wall) swings clear of the base pan: drum radius 38 => lowest
@@ -89,7 +106,6 @@ DRUM_BACK_T = 5.0           # back wall carrying the NEMA 17 mount
 HUB_D = 40.0
 HUB_W = 26.0
 FLANGE_BCD = 30.0           # bolt circle for a future shaft-clamp/output disc
-FLANGE_HOLE_D = 3.2
 FLANGE_N = 6
 
 # Clevis ears
@@ -105,22 +121,25 @@ BEAM_W = 24.0               # y extent +/-12: passes between the clevis ears
 UA_BEAM_H = 28.0
 FA_BEAM_H = 24.0
 
-# Base pan (stationary): reserves the base drive bay. The base motor +
-# gearbox arrangement (belt/coax) is part of the gearbox design = out of
-# scope; the pan provides the volume, a Ø68 output opening and a bolt circle.
+# Base pan (stationary): direct-drive base — the NEMA 17 stands vertically
+# through a floor opening (body 0..48 resting on the table), face bolted to a
+# 2 mm web under the top plate; a stiffening ring keeps the plate rigid. The
+# 50 mm height is a hard ceiling: the shoulder gearbox drum (radius 38 about
+# the 90 mm shoulder axis) sweeps 2 mm above the pan through full yaw.
 PAN_D = 140.0
 PAN_H = 50.0
 PAN_WALL = 4.0
 PAN_FLOOR_T = 3.0
-PAN_TOP_T = 3.0
-PAN_OPEN_D = DRUM_ID        # base drive cartridge output opening
-PAN_TOP_BCD = 78.0          # 6 x M3: future cartridge hangs from the top plate
-PAN_TOP_N = 6
-PAN_MOUNT_BCD = 120.0       # 4 x M4 table mount, through the floor
-PAN_MOUNT_D = 4.5
+PAN_WEB_T = 2.0             # thin web the motor face bolts against
+PAN_RING_T = 6.0            # stiffening ring thickness (outside the motor)
+PAN_RING_ID = 60.0          # ring clears the motor's 59.8 mm face diagonal
+PAN_MOUNT_BCD = 120.0       # 4 x M3 table mount, through the floor
 WIRE_HOLE_D = 12.0
+# The motor face must land exactly on the underside of the web: the body
+# spans table (z=0) to face (z=48) through the floor opening.
+assert PAN_H - PAN_WEB_T == NEMA_LEN, 'pan height must equal motor length + web'
 
-# Yaw column hub (theta-1 output disc, sits 0.5 mm above the pan top plate)
+# Yaw column hub: bolts onto the flange shaft hub at the motor shaft tip
 COL_HUB_D = 68.0
 COL_HUB_T = 12.0
 
@@ -250,20 +269,22 @@ def add_gearbox_drum(b, jx, jz):
     y_back1 = y_back0 - DRUM_BACK_T
     b.add(b.cyl((jx, y_open, jz), (jx, y_back1, jz), DRUM_OD))
     b.cut(b.cyl((jx, y_open + 1, jz), (jx, y_back0, jz), DRUM_ID))
-    # NEMA 17 mount on the back wall (motor hangs outboard along -Y)
+    # NEMA 17 mount on the back wall (motor hangs outboard along -Y; screws
+    # thread into the motor's own holes, so plain M3 clearance)
     b.cut(b.cyl((jx, y_back0 + 1, jz), (jx, y_back1 - 1, jz), NEMA_PILOT_D))
     h = NEMA_HOLE_SPACING / 2
     for dx, dz in ((h, h), (h, -h), (-h, h), (-h, -h)):
         b.cut(b.cyl((jx + dx, y_back0 + 1, jz + dz), (jx + dx, y_back1 - 1, jz + dz),
-                    NEMA_HOLE_D))
+                    M3_CLEAR_D))
 
 
 def add_hub(b, jx, jz):
     """Driven-link hub: rides the shaft between the ears. Torque arrives via
-    the shaft (collar-clamped, flange holes for a future clamp disc)."""
+    the shaft; the Ø4.6 flange holes take M3 heat-set inserts (from either
+    face) for a future shaft-clamp disc."""
     b.add(b.cyl((jx, -HUB_W / 2, jz), (jx, HUB_W / 2, jz), HUB_D))
     b.cut(b.cyl((jx, -HUB_W / 2 - 1, jz), (jx, HUB_W / 2 + 1, jz), SHAFT_BORE_D))
-    b.cut_bolt_circle_y(jx, jz, FLANGE_BCD, FLANGE_N, FLANGE_HOLE_D,
+    b.cut_bolt_circle_y(jx, jz, FLANGE_BCD, FLANGE_N, INSERT_D,
                         -HUB_W / 2 - 1, HUB_W / 2 + 1)
 
 
@@ -272,20 +293,31 @@ def add_hub(b, jx, jz):
 # ---------------------------------------------------------------------------
 
 def build_base_pan(pan_h):
-    """Stationary base: Ø140 x 50 drum. Hollow interior is the reserved base
-    drive bay (fits a NEMA 17 lying flat plus a Ø66 cycloidal cartridge); the
-    future cartridge hangs from the top plate on the Ø78 bolt circle and its
-    output reaches the yaw column through the Ø68 opening."""
+    """Stationary base: Ø140 x 50 drum, direct-drive. The NEMA 17 stands
+    vertically through a square floor opening (body spans the full 0..48,
+    bottom resting on the table) with its face bolted up against a 2 mm web
+    under the top plate; a Ø60..132 stiffening ring keeps the plate rigid.
+    Screw heads sit above the plate inside the drum's sweep circle."""
     b = Builder()
+    web_z = pan_h - PAN_WEB_T                 # motor mounting face plane
     b.add(b.cyl((0, 0, 0), (0, 0, pan_h), PAN_D))
-    # hollow the drive bay between floor and top plate
-    b.cut(b.cyl((0, 0, PAN_FLOOR_T), (0, 0, pan_h - PAN_TOP_T), PAN_D - 2 * PAN_WALL))
-    # output opening + cartridge bolt circle in the top plate
-    b.cut(b.cyl((0, 0, pan_h - PAN_TOP_T - 1), (0, 0, pan_h + 1), PAN_OPEN_D))
-    b.cut_bolt_circle_z(0, 0, PAN_TOP_BCD, PAN_TOP_N, NEMA_HOLE_D,
-                        pan_h - PAN_TOP_T - 1, pan_h + 1)
-    # table mount through the floor (accessible before cartridge install)
-    b.cut_bolt_circle_z(0, 0, PAN_MOUNT_BCD, 4, PAN_MOUNT_D, -1, PAN_FLOOR_T + 1,
+    # hollow the interior up to the stiffening ring
+    b.cut(b.cyl((0, 0, PAN_FLOOR_T), (0, 0, pan_h - PAN_RING_T),
+                PAN_D - 2 * PAN_WALL))
+    # relieve the ring's center so only the 2 mm web spans the motor face
+    # (the ring's Ø60 inner bore clears the motor's 59.8 mm face diagonal)
+    b.cut(b.cyl((0, 0, pan_h - PAN_RING_T), (0, 0, web_z), PAN_RING_ID))
+    # square floor opening: motor slides in from below, sits on the table
+    half = (NEMA_SQ + 1.0) / 2
+    b.cut(b.box(-half, half, -half, half, -1, PAN_FLOOR_T + 1))
+    # motor face mount through the web (screws into the motor's threads,
+    # heads on top at r=21.9 — inside the drum's r=25.75 sweep)
+    b.cut(b.cyl((0, 0, web_z - 1), (0, 0, pan_h + 1), NEMA_PILOT_D))
+    h = NEMA_HOLE_SPACING / 2
+    for dx, dy in ((h, h), (h, -h), (-h, h), (-h, -h)):
+        b.cut(b.cyl((dx, dy, web_z - 1), (dx, dy, pan_h + 1), M3_CLEAR_D))
+    # table mount through the floor (M3, accessible before the motor goes in)
+    b.cut_bolt_circle_z(0, 0, PAN_MOUNT_BCD, 4, M3_CLEAR_D, -1, PAN_FLOOR_T + 1,
                         clock_deg=45)
     # wire exit through the side wall
     b.cut(b.cyl((PAN_D / 2 - PAN_WALL - 2, 0, PAN_FLOOR_T + WIRE_HOLE_D / 2 + 2),
@@ -294,10 +326,12 @@ def build_base_pan(pan_h):
 
 
 def build_yaw_column(pan_h, shoulder_z):
-    """Theta-1 output: hub disc over the pan opening, clevis ears up to the
-    shoulder axis, and the reserved shoulder gearbox drum on the -Y ear."""
+    """Theta-1 output, direct-driven: the hub disc bolts onto a 5 mm flange
+    shaft hub set-screwed to the base motor's shaft (M3 screws from below
+    into heat-set inserts in the hub). Clevis ears rise to the shoulder axis;
+    the reserved shoulder gearbox drum hangs on the -Y ear."""
     b = Builder()
-    hub_z0 = pan_h + 0.5                       # running clearance over the pan
+    hub_z0 = (pan_h - PAN_WEB_T) + NEMA_SHAFT_LEN  # hub bottom = shaft tip
     hub_z1 = hub_z0 + COL_HUB_T
     ear_z0 = hub_z1 - 6.5                      # ears root into the hub disc
     b.add(b.cyl((0, 0, hub_z0), (0, 0, hub_z1), COL_HUB_D))
@@ -305,13 +339,11 @@ def build_yaw_column(pan_h, shoulder_z):
         b.add(b.box(-EAR_BOSS_D / 2, EAR_BOSS_D / 2,
                     s * EAR_IN, s * EAR_OUT, ear_z0, shoulder_z))
     add_clevis_bosses(b, 0, shoulder_z, drive_side=-1)
-    # base coupling: center bore + collar recess (axial retention on an 8 mm
-    # stub from the base cartridge) + output flange bolt circle
-    b.cut(b.cyl((0, 0, hub_z0 - 1), (0, 0, hub_z1 + 1), SHAFT_BORE_D))
-    b.cut(b.cyl((0, 0, hub_z1 - COLLAR_RECESS_DEPTH), (0, 0, hub_z1 + 1),
-                COLLAR_RECESS_D))
-    b.cut_bolt_circle_z(0, 0, FLANGE_BCD, FLANGE_N, FLANGE_HOLE_D,
-                        hub_z0 - 1, hub_z1 + 1, clock_deg=30)
+    # coupling interface in the hub's underside: clearance over the shaft tip
+    # plus 4 x M3 insert pockets on the flange hub's bolt circle
+    b.cut(b.cyl((0, 0, hub_z0 - 1), (0, 0, hub_z0 + 6), COUPLING_TIP_CLEAR_D))
+    b.cut_bolt_circle_z(0, 0, COUPLING_BCD, 4, INSERT_D,
+                        hub_z0 - 1, hub_z0 + INSERT_POCKET, clock_deg=45)
     cut_bearing_bores(b, 0, shoulder_z)
     add_gearbox_drum(b, 0, shoulder_z)
     return b.body
@@ -351,7 +383,9 @@ def build_forearm(shoulder_z, l_upper, l_fore):
     b.add(b.box(elbow_x, plate_x0 + 1, -BEAM_W / 2, BEAM_W / 2,
                 shoulder_z - FA_BEAM_H / 2, shoulder_z + FA_BEAM_H / 2))
     b.add(b.box(plate_x0, tcp_x, -20, 20, shoulder_z - 20, shoulder_z + 20))
-    # T8 nut interface on the plate, screw axis along X at the TCP centerline
+    # T8 nut interface on the plate, screw axis along X at the TCP centerline.
+    # The nut sits in the flange recess on the inner face; its M3 screws
+    # thread into blind heat-set inserts behind the recess floor.
     b.cut(b.cyl((plate_x0 - 1, 0, shoulder_z), (tcp_x + 1, 0, shoulder_z), T8_BORE_D))
     b.cut(b.cyl((plate_x0 - 1, 0, shoulder_z), (plate_x0 + T8_FLANGE_T, 0, shoulder_z),
                 T8_FLANGE_D))
@@ -359,7 +393,8 @@ def build_forearm(shoulder_z, l_upper, l_fore):
         a = math.radians(45) + i * math.pi / 2
         y = T8_BCD / 2 * math.cos(a)
         z = shoulder_z + T8_BCD / 2 * math.sin(a)
-        b.cut(b.cyl((plate_x0 - 1, y, z), (tcp_x + 1, y, z), T8_HOLE_D))
+        b.cut(b.cyl((plate_x0 - 1, y, z),
+                    (plate_x0 + T8_FLANGE_T + INSERT_POCKET, y, z), INSERT_D))
     return b.body
 
 

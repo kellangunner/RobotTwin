@@ -42,8 +42,8 @@ motor:
 # interactive UI overrides them live.
 gearboxes:
   base:
-    type: planetary
-    ratio: 5
+    type: direct     # base is direct-driven by its NEMA 17 (no gravity torque on the yaw axis)
+    ratio: 1
   shoulder:
     type: cycloidal
     ratio: 15
