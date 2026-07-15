@@ -4,8 +4,9 @@ import type { ReactNode } from 'react';
 
 export function Panel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-800 bg-slate-900/70 p-3">
-      <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+    <section className="overflow-hidden border border-zinc-400 bg-white p-3 shadow-sm">
+      <h2 className="mb-2 flex items-center gap-1.5 border-b border-zinc-300 pb-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
+        <span aria-hidden className="h-2 w-2 shrink-0 bg-orange-600" />
         {title}
       </h2>
       {children}
@@ -36,15 +37,15 @@ export function Slider({
   return (
     <label className="mb-1.5 block">
       <div className="flex justify-between text-xs">
-        <span className="text-slate-300">{label}</span>
-        <span className="tabular-nums text-slate-100">
+        <span className="text-zinc-700">{label}</span>
+        <span className="font-mono tabular-nums text-zinc-900">
           {shown}
-          {unit && <span className="ml-0.5 text-slate-500">{unit}</span>}
+          {unit && <span className="ml-0.5 text-zinc-500">{unit}</span>}
         </span>
       </div>
       <input
         type="range"
-        className="h-1.5 w-full cursor-pointer accent-sky-400"
+        className="slider-mech w-full cursor-pointer"
         min={min}
         max={max}
         step={step}
@@ -67,10 +68,10 @@ export function Chip({
   return (
     <button
       onClick={onClick}
-      className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+      className={`border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
         active
-          ? 'bg-sky-500/90 text-slate-950'
-          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+          ? 'border-orange-700 bg-orange-600 text-white'
+          : 'border-zinc-400 bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
       }`}
     >
       {children}

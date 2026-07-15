@@ -12,6 +12,7 @@ add_library(robottwin_core STATIC
   src/drivetrain/gearbox_model.cpp
   src/dynamics/dynamics.cpp
   src/planning/trajectory.cpp
+  src/planning/retime.cpp
   src/simulation/metrics.cpp
   src/geometry/collision.cpp
   src/io/waypoints.cpp
@@ -61,6 +62,7 @@ if(NOT EMSCRIPTEN)
     tests/test_drivetrain.cpp
     tests/test_gearbox_model.cpp
     tests/test_trajectory.cpp
+    tests/test_retime.cpp
     tests/test_collision.cpp
     tests/test_waypoints.cpp
   )

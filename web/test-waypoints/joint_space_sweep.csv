@@ -1,0 +1,16 @@
+# joint_space_sweep.csv — Joint space mode
+# theta1,theta2,theta3 (deg). A smooth open sweep across most of each joint's
+# range, followed by a base-limit violation (140 > 135 max) and an
+# extreme fold that should trip the self/ground collision check.
+# Expect 8 waypoints loaded, 2 skipped.
+theta1,theta2,theta3
+0,90,0
+20,80,20
+40,70,40
+60,60,60
+80,50,80
+100,40,100
+120,30,120
+135,20,140
+140,20,140
+0,0,150

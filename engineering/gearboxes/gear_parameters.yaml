@@ -1,0 +1,50 @@
+# Consumed by engineering/fusion/cycloidal_gearbox/cycloidal_gearbox.py (the
+# generator) and python/validate_cycloid.py (the checks). Both parse this file
+# directly — edit here, re-run both, never edit constants in the scripts.
+
+15-1_Gear:
+  external_pins: 16            # Zp = Zc + 1; ratio = Zc = 15
+  output_pins: 6
+  output_disk_diameter: 52.0   # cycloid disc tip Ø (root Ø48.0)
+  eccentricity: 1.0
+  thickness: 6.0               # per disc; two discs, clocked half a lobe
+  fixed_ring_diameter: 56.0    # ring-pin center circle (R = 28; the Ø6 pins
+                               # need R >= 28 to keep the disc output-hole walls)
+  external_pin_diamter: 6.0    # Ø6 x 25 steel dowels, same stock as the output pins
+  output_pin_diamter: 6.0      # on a Ø36 bolt circle
+  camshaft_hole: 24.2          # disc center bore = 6802-2RS OD 24 + 0.2
+
+20-1_Gear:
+  external_pins: 21
+  output_pins: 6
+  output_disk_diameter: 51.6   # tip Ø (root Ø48.4)
+  eccentricity: 0.8
+  thickness: 6.0
+  fixed_ring_diameter: 56.0
+  external_pin_diamter: 6.0
+  output_pin_diamter: 6.0
+  camshaft_hole: 24.2
+
+# Purchased hardware + mounting interface, shared by both ratios (v2
+# face-mounted cartridge). Every pin in the gearbox — ring and output — is
+# the same Ø6 x 25 steel dowel; nothing torque-bearing is printed as a pin.
+# The 608-2RS bearings, the 8 mm shaft, and its set-screw collars belong to
+# the linkage clevis (see the linkage BOM); the gearbox only meets them: the
+# output hub clamps the shaft and its boss bears on the inboard 608 inner race.
+hardware:
+  external_pin_length: 25.0    # ring dowels: pressed into the back plate,
+                               # wrapped by full-length wall grooves
+  external_pin_press_fit: 0.1  # diametral interference, plate blind holes
+  ring_groove_clearance: 0.15  # diametral, on the wall grooves
+  output_pin_length: 25.0      # Ø6 x 25 steel dowel pins, pressed into the flange
+  output_pin_bcd: 36.0         # drive-pin bolt circle on the output flange
+  output_pin_press_fit: 0.1    # diametral interference of the printed pin holes
+  output_hole_clearance: 0.3   # diametral, on the disc holes (Ø = pin + 2e + this)
+  shaft_diameter: 8.0          # main joint shaft (608-2RS + shaft collars in the ears)
+  shaft_bore_clearance: 0.2    # diametral; bore is closed by the pinch clamp
+  shaft_engagement: 10.0       # shaft depth in the output hub's blind bore
+  mount_bolt_circle: 66.0      # 6 x M3 into heat-set inserts in the linkage ear disc
+  mount_bolt_count: 6
+  mount_hole_diameter: 3.2     # snug on M3 so the screws center the housing
+  mount_flange_diameter: 76.0  # matches the ear disc (GBX_FLANGE_D in linkage_geometry)
+  mount_flange_thickness: 4.0

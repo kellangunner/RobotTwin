@@ -14,15 +14,13 @@ std::array<double, kNumJoints> gravityTorques(const JointAngles& q,
   const double c2 = std::cos(q[1]);
   const double c23 = std::cos(q[1] + q[2]);
   const double mTip = masses.gripper + payload;
-
-  // moment arms are horizontal distances from each joint axis
   const double tauElbow = kGravity * (masses.forearm * (L2 / 2.0) * c23 + mTip * L2 * c23);
   const double tauShoulder =
       kGravity * ((masses.upperArm * (L1 / 2.0) + masses.elbowMotor * L1) * c2 +
                   masses.forearm * (L1 * c2 + (L2 / 2.0) * c23) +
                   mTip * (L1 * c2 + L2 * c23));
 
-  return {0.0, tauShoulder, tauElbow}; // base axis is vertical → no gravity load
+  return {0.0, tauShoulder, tauElbow}; // base axis is vertical so no gravity load
 }
 
 std::array<double, kNumJoints> worstCaseLinkInertia(const LinkGeometry& geom,
@@ -43,4 +41,4 @@ std::array<double, kNumJoints> worstCaseLinkInertia(const LinkGeometry& geom,
   return {aboutBase, aboutShoulder, aboutElbow};
 }
 
-} // namespace rt
+}

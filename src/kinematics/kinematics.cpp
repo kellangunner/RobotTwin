@@ -7,7 +7,6 @@
 namespace rt {
 
 namespace {
-/** Angular tolerance below which singularities are flagged (≈ 2.9°). */
 constexpr double kSingularityTol = 0.05;
 constexpr double kReachTol = 1e-9;
 

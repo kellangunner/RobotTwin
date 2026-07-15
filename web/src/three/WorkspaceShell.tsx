@@ -22,9 +22,9 @@ export function WorkspaceShell() {
   return (
     <mesh geometry={geometry} rotation={[Math.PI / 2, 0, 0]}>
       <meshBasicMaterial
-        color="#38bdf8"
+        color="#0369a1"
         transparent
-        opacity={0.07}
+        opacity={0.08}
         side={THREE.DoubleSide}
         depthWrite={false}
       />

@@ -1,0 +1,13 @@
+# cartesian_mixed.csv — parser stress test: Cartesian (IK) mode
+# Exercises: leading header tolerance, comma/tab/semicolon delimiters,
+# an unreachable point, a collision near the base column, and two
+# malformed rows. Expect 4 waypoints loaded, 4 skipped.
+x,y,z (mm)
+150, 0, 150
+0	150	150
+-75; 129.9; 150
+1000,1000,1000
+15,0,50
+50,50
+abc,50,50
+-129.9,75,150

@@ -29,7 +29,7 @@ function TargetControls() {
       <Slider label="Target Y" value={m2mm(target[1])} min={-REACH_MM} max={REACH_MM} step={2} unit="mm" format={(v) => v.toFixed(0)} onChange={axis(1)} />
       <Slider label="Target Z" value={m2mm(target[2])} min={-20} max={m2mm(config.links.baseHeight) + REACH_MM} step={2} unit="mm" format={(v) => v.toFixed(0)} onChange={axis(2)} />
       <div className="mt-1 flex items-center gap-1">
-        <span className="mr-1 text-[10px] uppercase tracking-wide text-slate-500">Branch</span>
+        <span className="mr-1 text-[10px] uppercase tracking-wide text-zinc-500">Branch</span>
         <Chip active={branch === 'elbow-up'} onClick={() => setBranch('elbow-up')}>elbow-up</Chip>
         <Chip active={branch === 'elbow-down'} onClick={() => setBranch('elbow-down')}>elbow-down</Chip>
       </div>
@@ -70,7 +70,7 @@ function StatusLine() {
   if (sequence) {
     const at = Math.min(sequence.index, sequence.targets.length);
     return (
-      <div className="mt-2 text-xs text-sky-300">
+      <div className="mt-2 font-mono text-xs text-orange-700">
         ▶ waypoint {at}/{sequence.targets.length}…
       </div>
     );
@@ -78,20 +78,20 @@ function StatusLine() {
   return (
     <div className="mt-2 text-xs">
       {status.kind === 'ok' && !status.nearSingularity && (
-        <span className="text-emerald-400">● target reachable</span>
+        <span className="text-emerald-700">● target reachable</span>
       )}
       {status.kind === 'ok' && status.nearSingularity && (
-        <span className="text-amber-400">● reachable — near singularity</span>
+        <span className="text-amber-600">● reachable — near singularity</span>
       )}
-      {status.kind === 'unreachable' && <span className="text-red-400">● out of reach</span>}
+      {status.kind === 'unreachable' && <span className="text-red-600">● out of reach</span>}
       {status.kind === 'limits' && (
-        <span className="text-red-400">● reachable only outside joint limits</span>
+        <span className="text-red-600">● reachable only outside joint limits</span>
       )}
       {status.kind === 'collision' && (
-        <span className="text-red-400">● blocked — {status.issues[0]}</span>
+        <span className="text-red-600">● blocked — {status.issues[0]}</span>
       )}
       {status.kind === 'path-collision' && (
-        <span className="text-red-400">● move blocked — path collision: {status.issues[0]}</span>
+        <span className="text-red-600">● move blocked — path collision: {status.issues[0]}</span>
       )}
     </div>
   );
@@ -128,15 +128,15 @@ function CsvLoader() {
   };
 
   return (
-    <div className="mt-2 border-t border-slate-800 pt-2">
+    <div className="mt-2 border-t border-zinc-300 pt-2">
       <div className="flex items-center gap-1">
         <Chip onClick={() => fileRef.current?.click()}>⭱ Load CSV</Chip>
-        <span className="text-[10px] text-slate-500">
+        <span className="text-[10px] text-zinc-500">
           rows: {mode === 'target' ? 'x, y, z (mm)' : 'θ1, θ2, θ3 (deg)'}
         </span>
       </div>
       <input ref={fileRef} type="file" accept=".csv,text/csv,text/plain" className="hidden" onChange={onFile} />
-      {message && <p className="mt-1 text-[10px] text-slate-400">{message}</p>}
+      {message && <p className="mt-1 text-[10px] text-zinc-500">{message}</p>}
     </div>
   );
 }

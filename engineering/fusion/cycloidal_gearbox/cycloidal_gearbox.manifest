@@ -1,0 +1,10 @@
+{
+    "autodeskProduct": "Fusion360",
+    "type": "script",
+    "author": "RobotTwin",
+    "description": {
+        "": "Generates the RobotTwin 15:1 and 20:1 cycloidal gearbox cartridges and exports f3d/step/stl."
+    },
+    "supportedOS": "windows|mac",
+    "editEnabled": true
+}

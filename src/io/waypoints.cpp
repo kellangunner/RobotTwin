@@ -1,6 +1,7 @@
 #include "waypoints.hpp"
 
 #include <cmath>
+#include <cstdlib>
 #include <sstream>
 
 #include "../geometry/collision.hpp"
@@ -17,7 +18,10 @@ std::string trim(const std::string& s) {
   return s.substr(b, e - b + 1);
 }
 
-/** Split a CSV row on commas/semicolons/tabs/spaces into numeric fields. */
+/** Split a CSV row on commas/semicolons/tabs/spaces into numeric fields.
+ *  Uses strtod rather than std::stod: header rows and malformed tokens are
+ *  expected input here, and the WASM build compiles without C++ exceptions,
+ *  where std::stod's throw-on-failure would abort the whole runtime. */
 bool parseThreeNumbers(const std::string& line, std::array<double, 3>& out) {
   std::string norm = line;
   for (char& c : norm) {
@@ -28,13 +32,9 @@ bool parseThreeNumbers(const std::string& line, std::array<double, 3>& out) {
   std::string tok;
   while (ss >> tok) {
     if (n >= 3) return false; // too many fields
-    try {
-      size_t used = 0;
-      out[n] = std::stod(tok, &used);
-      if (used != tok.size()) return false;
-    } catch (...) {
-      return false;
-    }
+    char* end = nullptr;
+    out[n] = std::strtod(tok.c_str(), &end);
+    if (end != tok.c_str() + tok.size()) return false;
     ++n;
   }
   return n == 3;

@@ -94,6 +94,15 @@ build CMakeFiles/robottwin_core.dir/src/planning/trajectory.cpp.o: CXX_COMPILER_
   OBJECT_FILE_DIR = CMakeFiles\robottwin_core.dir\src\planning
   TARGET_SUPPORT_DIR = CMakeFiles\robottwin_core.dir
 
+build CMakeFiles/robottwin_core.dir/src/planning/retime.cpp.o: CXX_COMPILER__robottwin_core_unscanned_Release C$:/Users/kgunner/Documents/GitHub/RobotTwin/src/planning/retime.cpp || cmake_object_order_depends_target_robottwin_core
+  CONFIG = Release
+  DEP_FILE = CMakeFiles\robottwin_core.dir\src\planning\retime.cpp.o.d
+  FLAGS = -O3 -DNDEBUG -std=c++20 -Wall -Wextra
+  INCLUDES = -IC:/Users/kgunner/Documents/GitHub/RobotTwin/src
+  OBJECT_DIR = CMakeFiles\robottwin_core.dir
+  OBJECT_FILE_DIR = CMakeFiles\robottwin_core.dir\src\planning
+  TARGET_SUPPORT_DIR = CMakeFiles\robottwin_core.dir
+
 build CMakeFiles/robottwin_core.dir/src/simulation/metrics.cpp.o: CXX_COMPILER__robottwin_core_unscanned_Release C$:/Users/kgunner/Documents/GitHub/RobotTwin/src/simulation/metrics.cpp || cmake_object_order_depends_target_robottwin_core
   CONFIG = Release
   DEP_FILE = CMakeFiles\robottwin_core.dir\src\simulation\metrics.cpp.o.d
@@ -129,7 +138,7 @@ build CMakeFiles/robottwin_core.dir/src/io/waypoints.cpp.o: CXX_COMPILER__robott
 #############################################
 # Link the static library librobottwin_core.a
 
-build librobottwin_core.a: CXX_STATIC_LIBRARY_LINKER__robottwin_core_Release CMakeFiles/robottwin_core.dir/src/kinematics/kinematics.cpp.o CMakeFiles/robottwin_core.dir/src/drivetrain/drivetrain.cpp.o CMakeFiles/robottwin_core.dir/src/drivetrain/gearbox_model.cpp.o CMakeFiles/robottwin_core.dir/src/dynamics/dynamics.cpp.o CMakeFiles/robottwin_core.dir/src/planning/trajectory.cpp.o CMakeFiles/robottwin_core.dir/src/simulation/metrics.cpp.o CMakeFiles/robottwin_core.dir/src/geometry/collision.cpp.o CMakeFiles/robottwin_core.dir/src/io/waypoints.cpp.o
+build librobottwin_core.a: CXX_STATIC_LIBRARY_LINKER__robottwin_core_Release CMakeFiles/robottwin_core.dir/src/kinematics/kinematics.cpp.o CMakeFiles/robottwin_core.dir/src/drivetrain/drivetrain.cpp.o CMakeFiles/robottwin_core.dir/src/drivetrain/gearbox_model.cpp.o CMakeFiles/robottwin_core.dir/src/dynamics/dynamics.cpp.o CMakeFiles/robottwin_core.dir/src/planning/trajectory.cpp.o CMakeFiles/robottwin_core.dir/src/planning/retime.cpp.o CMakeFiles/robottwin_core.dir/src/simulation/metrics.cpp.o CMakeFiles/robottwin_core.dir/src/geometry/collision.cpp.o CMakeFiles/robottwin_core.dir/src/io/waypoints.cpp.o
   CONFIG = Release
   LANGUAGE_COMPILE_FLAGS = -O3 -DNDEBUG
   OBJECT_DIR = CMakeFiles\robottwin_core.dir

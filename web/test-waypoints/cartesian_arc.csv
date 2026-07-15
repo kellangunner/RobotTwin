@@ -1,0 +1,14 @@
+# cartesian_arc.csv — happy path: Cartesian (IK) mode
+# Semicircular sweep, radius 150mm, fixed height z=150mm, base yaw -120..120 deg.
+# All points comfortably within reach (240mm) and joint limits; use with
+# "Cartesian (IK)" mode selected in the Pose command panel.
+x,y,z
+-75.0,-129.9,150
+0,-150,150
+75.0,-129.9,150
+129.9,-75.0,150
+150,0,150
+129.9,75.0,150
+75.0,129.9,150
+0,150,150
+-75.0,129.9,150

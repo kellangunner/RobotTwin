@@ -5,13 +5,15 @@ import { Canvas } from '@react-three/fiber';
 import { Line, OrbitControls } from '@react-three/drei';
 import { useTwinStore } from '../state/store';
 import { RobotModel } from './RobotModel';
+import { ReferenceFrame } from './ReferenceFrame';
+import { WorkspaceQuadrants } from './WorkspaceQuadrants';
 import { WorkspaceShell } from './WorkspaceShell';
 
 function TargetMarker() {
   const target = useTwinStore((s) => s.target);
   const status = useTwinStore((s) => s.ikStatus);
   const color =
-    status.kind === 'ok' ? (status.nearSingularity ? '#f59e0b' : '#34d399') : '#ef4444';
+    status.kind === 'ok' ? (status.nearSingularity ? '#d97706' : '#059669') : '#dc2626';
   return (
     <group position={target}>
       <mesh>
@@ -29,7 +31,7 @@ function TargetMarker() {
 function TcpTrace() {
   const trace = useTwinStore((s) => s.trace);
   if (trace.length < 2) return null;
-  return <Line points={trace} color="#e8b339" lineWidth={1.5} transparent opacity={0.8} />;
+  return <Line points={trace} color="#b45309" lineWidth={1.5} transparent opacity={0.85} />;
 }
 
 export function Scene() {
@@ -38,7 +40,7 @@ export function Scene() {
       shadows
       camera={{ position: [0.45, -0.42, 0.34], up: [0, 0, 1], fov: 42, near: 0.01, far: 10 }}
     >
-      <color attach="background" args={['#0b0f14']} />
+      <color attach="background" args={['#e3e7ea']} />
       <ambientLight intensity={0.55} />
       <directionalLight
         position={[0.5, -0.8, 1.2]}
@@ -51,16 +53,17 @@ export function Scene() {
       {/* table */}
       <mesh position={[0, 0, -0.003]} rotation={[Math.PI / 2, 0, 0]} receiveShadow>
         <cylinderGeometry args={[0.34, 0.34, 0.006, 64]} />
-        <meshStandardMaterial color="#141a22" roughness={0.9} />
+        <meshStandardMaterial color="#dfe3e7" roughness={0.9} />
       </mesh>
       <gridHelper
-        args={[0.68, 17, '#2b3644', '#1b2430']}
+        args={[0.68, 17, '#8d99a6', '#b4bdc6']}
         rotation={[Math.PI / 2, 0, 0]}
         position={[0, 0, 0.0005]}
       />
-      <axesHelper args={[0.06]} />
+      <WorkspaceQuadrants />
 
       <RobotModel />
+      <ReferenceFrame />
       <WorkspaceShell />
       <TargetMarker />
       <TcpTrace />

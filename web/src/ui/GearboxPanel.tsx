@@ -33,10 +33,10 @@ function GearboxCard({ joint }: { joint: JointName }) {
   const { stages } = deriveGearbox(config.gearboxModels, drive.type, drive.ratio);
 
   return (
-    <div className="mb-3 rounded-md border border-slate-800 bg-slate-950/50 p-2 last:mb-0">
+    <div className="mb-3 border border-zinc-300 bg-zinc-50 p-2 last:mb-0">
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-xs font-semibold text-slate-200">{JOINT_LABEL[joint]}</span>
-        <span className="text-[10px] uppercase tracking-wide text-sky-400">
+        <span className="text-xs font-semibold text-zinc-800">{JOINT_LABEL[joint]}</span>
+        <span className="font-mono text-[10px] uppercase tracking-wide text-orange-700">
           {gb.ratio.toFixed(gb.ratio % 1 ? 1 : 0)}:1
           {drive.type === 'planetary' && stages > 1 && ` · ${stages}-stage`}
         </span>
@@ -63,16 +63,16 @@ function GearboxCard({ joint }: { joint: JointName }) {
       )}
 
       <dl className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px]">
-        <dt className="text-slate-500">Efficiency</dt>
-        <dd className="text-right tabular-nums text-slate-300">
+        <dt className="text-zinc-500">Efficiency</dt>
+        <dd className="text-right font-mono tabular-nums text-zinc-700">
           {(gb.efficiency * 100).toFixed(0)}%
         </dd>
-        <dt className="text-slate-500">Backlash</dt>
-        <dd className="text-right tabular-nums text-slate-300">
+        <dt className="text-zinc-500">Backlash</dt>
+        <dd className="text-right font-mono tabular-nums text-zinc-700">
           {gb.backlash === 0 ? '~0 (cycloidal)' : `${rad2deg(gb.backlash).toFixed(2)}°`}
         </dd>
-        <dt className="text-slate-500">Torque cap</dt>
-        <dd className="text-right tabular-nums text-slate-300">{gb.maxTorque.toFixed(1)} N·m</dd>
+        <dt className="text-zinc-500">Torque cap</dt>
+        <dd className="text-right font-mono tabular-nums text-zinc-700">{gb.maxTorque.toFixed(1)} N·m</dd>
       </dl>
     </div>
   );

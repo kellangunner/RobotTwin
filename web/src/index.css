@@ -5,4 +5,43 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  background-color: #eef0f2;
+}
+
+/* Engineering-paper backdrop: faint 16 mm-ish grid behind the whole app. */
+.grid-paper {
+  background-color: #eef0f2;
+  background-image:
+    linear-gradient(to right, rgba(71, 85, 105, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(71, 85, 105, 0.08) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* Flat "machined" range input: hairline track, rectangular safety-orange thumb. */
+input[type='range'].slider-mech {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border: 1px solid #9aa3ad;
+  border-radius: 0;
+  background: #d4d8dd;
+  outline-offset: 2px;
+}
+input[type='range'].slider-mech::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 16px;
+  border: 1px solid #7c2d12;
+  border-radius: 1px;
+  background: #ea580c;
+  cursor: pointer;
+}
+input[type='range'].slider-mech::-moz-range-thumb {
+  width: 10px;
+  height: 16px;
+  border: 1px solid #7c2d12;
+  border-radius: 1px;
+  background: #ea580c;
+  cursor: pointer;
 }

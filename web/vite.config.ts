@@ -5,6 +5,9 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // relative asset URLs so the built twin can be served standalone or
+  // embedded under any subpath (e.g. the portfolio site's /robot-twin/sim/)
+  base: './',
   build: {
     // top-level await in core/api.ts (WASM module init)
     target: 'es2022',
