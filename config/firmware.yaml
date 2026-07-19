@@ -1,0 +1,87 @@
+# RobotTwin — firmware/electronics parameters (ESP32 + 3x TMC2209).
+# Companion to robot.yaml: that file describes the robot, this file describes
+# the controller wired to it — pins, homing, control rates, safety margins.
+# Embedded into the firmware image at build time and parsed at boot, so a pin
+# change is a config edit + reflash, never a code change.
+#
+# Pin defaults target a plain ESP32 DevKit (WROOM-32). Constraints honored:
+#   - step/dir/enable pins must be < GPIO32 (ISR uses the low GPIO bank)
+#   - strapping pins (0, 2, 5, 12, 15) and input-only pins (34-39) avoided
+# Homing values are bring-up placeholders — finalize against the real arm.
+
+firmware:
+  name: rt-arm-fw
+
+serial:
+  baud: 115200
+  telemetry_hz_default: 0    # ST lines per second at boot (0 = off, TELEM enables)
+
+control:
+  loop_hz: 1000              # trajectory-following / homing state machine rate
+  step_tick_hz: 40000        # step-generator ISR rate; also the max step rate
+
+safety:
+  torque_ceiling: 0.90       # retime moves until peak utilization <= this
+  max_stretch: 32            # give up (reject move) beyond this duration multiplier
+  min_move_duration_s: 0.25
+  homing_timeout_s: 30       # per-joint seek watchdog
+
+driver_enable:               # one EN line shared by all three TMC2209s
+  pin: 23
+  active_low: true
+
+# Optional single-wire UART to the TMC2209s (TX through a 1k resistor to the
+# shared PDN_UART line; drivers are addressed by their MS1/MS2 straps).
+# When disabled, drivers run on their pin-strap defaults and the microstepping
+# below MUST match robot.yaml motor.microstepping by wiring.
+tmc_uart:
+  enabled: false
+  tx_pin: 26
+  baud: 115200
+  irun: 16                   # run current scale 0..31 (31 = full scale)
+  ihold: 8                   # standstill current scale 0..31
+
+# Homing runs joint-by-joint in this order. Elbow first assumes the arm is
+# racked roughly upright at power-on; revisit during bring-up.
+homing_order: [elbow, shoulder, base]
+
+joints:
+  base:
+    step_pin: 16
+    dir_pin: 17
+    invert_dir: false
+    uart_address: 0          # TMC2209 MS1/MS2 strap address (0..3)
+    limit:
+      pin: 32
+      active_low: true       # switch pulls to GND, internal pull-up
+      home_angle_deg: -135   # joint angle when the switch triggers
+      seek_dir: -1           # +1 / -1: direction of travel toward the switch
+      seek_fast_deg_s: 20
+      seek_slow_deg_s: 4
+      backoff_deg: 5
+  shoulder:
+    step_pin: 18
+    dir_pin: 19
+    invert_dir: false
+    uart_address: 1
+    limit:
+      pin: 33
+      active_low: true
+      home_angle_deg: 90     # switch at vertical: gravity-neutral, collision-free
+      seek_dir: 1
+      seek_fast_deg_s: 10
+      seek_slow_deg_s: 2
+      backoff_deg: 4
+  elbow:
+    step_pin: 21
+    dir_pin: 22
+    invert_dir: false
+    uart_address: 2
+    limit:
+      pin: 25
+      active_low: true
+      home_angle_deg: -150
+      seek_dir: -1
+      seek_fast_deg_s: 15
+      seek_slow_deg_s: 3
+      backoff_deg: 5

@@ -1,0 +1,16 @@
+# RobotTwin firmware defaults (merged into the generated sdkconfig on first build).
+
+# The core library reports config/planning errors via exceptions.
+CONFIG_COMPILER_CXX_EXCEPTIONS=y
+
+# ESP32 has no double-precision FPU; -O2 keeps the software-double math cheap.
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
+# 1 ms FreeRTOS tick so the 1 kHz control task can vTaskDelayUntil() per tick.
+CONFIG_FREERTOS_HZ=1000
+
+# app_main runs the serial console + planning pipeline (YAML parse, IK, audit).
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=20480
+
+# UART0 carries the line protocol — keep boot/log chatter off of it.
+CONFIG_LOG_DEFAULT_LEVEL_WARN=y
