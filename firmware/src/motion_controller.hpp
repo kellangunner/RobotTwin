@@ -58,6 +58,7 @@ class MotionController {
   CmdResult home();
   CmdResult moveJoints(const rt::JointAngles& q);
   CmdResult moveLinear(const rt::Vec3& target);
+  CmdResult setHome(const rt::JointAngles& q);
   CmdResult setPayload(double kg);
 
   rt::proto::StateReport state() const;

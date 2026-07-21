@@ -61,12 +61,22 @@ timeout, stuck switch). `STOP` halts and clears FAULT; `DISABLE` de-energizes an
 
 ## Homing
 
-Joint-by-joint in `homing_order`, per-joint watchdog `homing_timeout_s`:
+Two ways to establish the datum; both set `homed` and unlock moves, and both are lost on
+`DISABLE`.
 
-seek fast toward the switch → back off `backoff_deg` → re-seek slow → the slow trip is the
-datum (`setPosition(home_angle_deg)`) → back off again to release the switch. Steps are the
-ground truth thereafter; before the first HOME, position 0 is simply the boot pose and moves
-are refused with `ERR NOT_HOMED`.
+**`SETHOME θ₁ θ₂ θ₃` (manual, no switches).** The operator places the arm at a known pose and
+declares it: the firmware validates the angles against the joint limits, `setPosition`s each
+step counter to them, and marks `homed`. This is the datum path for the arm as designed —
+it has no limit switches and no hard stops. Requires `ENABLE` first (drivers must be holding
+the placed pose).
+
+**`HOME` (switch-seek, only if switches are fitted).** Joint-by-joint in `homing_order`,
+per-joint watchdog `homing_timeout_s`: seek fast toward the switch → back off `backoff_deg` →
+re-seek slow → the slow trip is the datum (`setPosition(home_angle_deg)`) → back off again to
+release the switch.
+
+Steps are the ground truth thereafter; before the first datum, position 0 is simply the boot
+pose and moves are refused with `ERR NOT_HOMED`.
 
 ## Step generation
 
@@ -76,12 +86,16 @@ and the max step rate equals `step_tick_hz`. The control loop feeds absolute mic
 plus a tracking rate (sampled |q̇| × 1.25 + 50 steps/s so quantization never outruns the DDA).
 Conversion is `steps/rad = 1 / jointResolution(motor, gearbox)` from the shared drivetrain model.
 
-## TMC2209 UART (optional)
+## TMC2209 UART (enabled)
 
-When `tmc_uart.enabled`, boot pushes GCONF (UART current control, MRES from register), CHOPCONF
-(microstep resolution from `robot.yaml motor.microstepping`) and IHOLD_IRUN to each strap-addressed
-driver over the shared single-wire UART. Write-only — nothing is read back; step/dir remains the
-only motion path. When disabled, the MS1/MS2 pin straps must match `robot.yaml` by wiring.
+This build runs `tmc_uart.enabled: true`: boot pushes GCONF (UART current control, MRES from
+register), CHOPCONF (microstep resolution from `robot.yaml motor.microstepping`) and IHOLD_IRUN
+to each strap-addressed driver over the shared single-wire UART (GPIO26 through a 1 kΩ resistor
+to the bussed PDN_UART pins; MS1/MS2 are the address straps — base 0, shoulder 1, elbow 2).
+Motor current therefore comes from `firmware.yaml` `irun`/`ihold`, not the VREF pots, and a
+current change is a config edit + reflash. Write-only — nothing is read back; step/dir remains
+the only motion path. If disabled, the MS1/MS2 straps revert to microstep-select and must match
+`robot.yaml` by wiring.
 
 ## Building
 

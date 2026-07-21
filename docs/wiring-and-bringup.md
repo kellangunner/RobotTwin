@@ -15,14 +15,19 @@ From the [BOM](BOM.md) electronics section:
 - 3 × TMC2209 stepper driver modules (StepStick/BTT-style carriers)
 - 3 × NEMA 17 steppers (17HS4401 or similar, 4-wire bipolar)
 - 3 × electrolytic capacitors, ≥100 µF ≥35 V (one across VM per driver)
-- 3 × lever microswitches (limit switches, one per joint)
+- 3 × lever microswitches (limit switches, one per joint) — **optional**: only
+  needed for switch-seek `HOME`; this build datums with `SETHOME` (see the
+  homing note in the bring-up procedure)
 - Motor PSU: 12–24 V DC, ≥5 A at 12 V (24 V preferred for speed headroom)
 - USB cable (powers the ESP32 and carries the serial console)
-- Hookup wire; 1 × 1 kΩ resistor only if you enable the TMC2209 UART
+- Hookup wire; 1 × 1 kΩ resistor for the TMC2209 UART bus (TX → PDN_UART)
 
 A breadboard works for the smoke test, but solder or use crimped dupont/JST
 connections for anything that moves — a step pin that loses contact mid-move
-means lost steps the firmware cannot detect.
+means lost steps the firmware cannot detect. For a bench rig, there is a
+board-agnostic breadboard layout (net list + per-module rules, works on
+any boards) in [breadboard-wiring.md](breadboard-wiring.md) (drop `irun`
+so phase current stays ≤ 0.8 A on breadboards).
 
 ## Power architecture
 
@@ -49,10 +54,17 @@ All values from `config/firmware.yaml`. Step/dir/enable must stay below
 GPIO32 (the step ISR writes the low GPIO bank's registers); limit switches
 may use any input-capable pin.
 
+> The base joint uses GPIO4/GPIO27 rather than the GPIO16/GPIO17 you'll see
+> on many WROOM-32 pinout diagrams: some DevKits (the 30-pin ELEGOO board
+> among them) don't break those two out. GPIO4/27 are the free, non-strapping,
+> sub-GPIO32 pins that satisfy the same constraints; GPIO14 is the remaining
+> spare. If your board *does* expose 16/17 and you'd rather use them, change
+> `joints.base.step_pin`/`dir_pin` in `firmware.yaml` and reflash.
+
 | Signal | ESP32 GPIO | Goes to |
 |---|---|---|
-| Base STEP | 16 | base driver STEP |
-| Base DIR | 17 | base driver DIR |
+| Base STEP | 4 | base driver STEP |
+| Base DIR | 27 | base driver DIR |
 | Shoulder STEP | 18 | shoulder driver STEP |
 | Shoulder DIR | 19 | shoulder driver DIR |
 | Elbow STEP | 21 | elbow driver STEP |
@@ -61,7 +73,7 @@ may use any input-capable pin.
 | Base limit switch | 32 | switch → GND (active-low, internal pull-up) |
 | Shoulder limit switch | 33 | switch → GND |
 | Elbow limit switch | 25 | switch → GND |
-| TMC UART TX (optional) | 26 | 1 kΩ → shared PDN_UART line |
+| TMC UART TX | 26 | 1 kΩ → shared PDN_UART line, all three drivers |
 
 GPIO 13 is reserved for the future gripper axis — one 50 Hz servo-PWM
 channel for its SG-90 (no driver, no limit switch; budget ~650 mA of 5 V
@@ -72,8 +84,8 @@ stall transient). Leave it free.
                 ┌───────────────────────┐
    USB ────────►│ 5V/USB          3V3   ├──► VIO on all 3 drivers
                 │                 GND   ├──► common ground (PSU − too)
-                │ GPIO16 ─ STEP ┐       │
-                │ GPIO17 ─ DIR  ├─ base driver
+                │ GPIO4  ─ STEP ┐       │
+                │ GPIO27 ─ DIR  ├─ base driver
                 │ GPIO18 ─ STEP ┐       │
                 │ GPIO19 ─ DIR  ├─ shoulder driver
                 │ GPIO21 ─ STEP ┐       │
@@ -82,7 +94,7 @@ stall transient). Leave it free.
                 │ GPIO32 ◄── base limit ──── GND
                 │ GPIO33 ◄── shoulder limit ─ GND
                 │ GPIO25 ◄── elbow limit ─── GND
-                │ GPIO26 ─ 1kΩ ─ PDN_UART (optional, all three)
+                │ GPIO26 ─ 1kΩ ─ PDN_UART bus (all three)
                 └───────────────────────┘
 
      12–24 V PSU ──┬── VM/GND driver 1 (+100 µF cap at the driver)
@@ -101,7 +113,8 @@ Each of the three drivers gets:
 | STEP, DIR | the joint's GPIOs from the pin map |
 | EN | GPIO23 (shared by all three) |
 | A1, A2, B1, B2 | one motor coil per pair (see below) |
-| MS1, MS2 | strap per the microstepping/UART section below |
+| MS1, MS2 | UART address straps — per the table below |
+| PDN_UART | shared bus from GPIO26 (through the 1 kΩ) |
 
 **Motor coils:** a 4-wire bipolar stepper has two coils. Find the pairs with
 a multimeter (a coil pair shows a few ohms; across coils is open). One pair
@@ -109,29 +122,26 @@ goes to A1/A2, the other to B1/B2. Which pair is "A" and which wire is which
 within a pair only affects rotation direction — fixed later in software with
 `invert_dir`, so don't agonize over it.
 
-**Current limit (VREF):** with the UART disabled (the default), motor
-current is set by the potentiometer on each carrier. Target roughly
-**1.0 A RMS per phase** for an uncooled 17HS4401 (rated 1.7 A) — set VREF
-per your specific carrier's formula, as sense-resistor values differ between
-brands. If you settle on a current well below rated, derate
+**Current limit (set over UART, not the pot):** this build runs
+`tmc_uart.enabled: true`, so at boot the firmware programs each driver's
+run/hold current from `firmware.yaml` (`irun: 16`, `ihold: 8`, on a 0–31
+scale) and the onboard VREF potentiometer is **ignored** — don't chase it
+with a screwdriver. With the 110 mΩ sense resistors on typical carriers,
+`irun: 16` lands near **0.9–1.0 A RMS**, right for an uncooled 17HS4401
+(rated 1.7 A); sense values differ between brands, so if a motor runs
+notably weak or hot, check your carrier's sense resistors before blaming
+the config. Changing current = edit `irun`/`ihold` and reflash (the YAML
+is embedded in the image). If you settle well below rated current, derate
 `robot.yaml motor.holding_torque_nm` proportionally so the twin and the
 firmware torque governor plan against the torque you actually have.
 
-## Microstepping straps (MS1/MS2)
+## UART address straps (MS1/MS2) and the PDN bus
 
-The firmware assumes **1/16 microstepping** (`robot.yaml
-motor.microstepping: 16`). How MS1/MS2 must be strapped depends on the UART
-mode in `firmware.yaml`:
-
-**UART disabled (`tmc_uart.enabled: false`, the default):** MS1/MS2 select
-the microstep resolution in hardware. Tie **both MS1 and MS2 to VIO (high)**
-on all three drivers → 1/16 step. If the straps don't match the YAML, every
-move lands at the wrong angle by an exact power of two — that's the symptom
-to check.
-
-**UART enabled (`tmc_uart.enabled: true`):** MS1/MS2 become the UART address
-instead, and the firmware programs microstepping and run/hold currents over
-the wire at boot. Strap per `firmware.yaml` `uart_address`:
+With the UART enabled, MS1/MS2 are **address pins**, not microstep
+selects — the firmware pushes the microstep resolution (1/16, from
+`robot.yaml motor.microstepping`) over the wire at boot via CHOPCONF.
+Strap each driver to match its `uart_address` in `firmware.yaml`, and
+note every driver needs a **unique** address:
 
 | Joint | Address | MS1 | MS2 |
 |---|---|---|---|
@@ -139,8 +149,16 @@ the wire at boot. Strap per `firmware.yaml` `uart_address`:
 | shoulder | 1 | VIO | GND |
 | elbow | 2 | GND | VIO |
 
-Wire GPIO26 through the 1 kΩ resistor to all three PDN_UART pins bussed
-together. The link is write-only — step/dir remains the only motion path.
+Wire GPIO26 through the single 1 kΩ resistor, then bus it to all three
+PDN_UART pins tied together. The link is write-only — nothing is read
+back, and step/dir remains the only motion path. Two drivers strapped to
+the same address will both accept that address's settings and neither
+will fault, so a strap mistake shows up as behavior, not an error (see
+troubleshooting).
+
+Fallback for reference: if `tmc_uart.enabled` is ever set back to false,
+the straps revert to hardware microstep-select (both MS1 and MS2 high =
+1/16) and the VREF pot rules current again.
 
 ## Limit switches
 
@@ -180,6 +198,18 @@ reflash** — but never a code change.
 Work through these stages in order; each one only risks what the previous
 stage verified.
 
+> **Homing without limit switches (this build).** The arm as designed has no
+> limit switches and no hard stops, so the switch-seek `HOME` command isn't
+> usable — this build datums with **`SETHOME`** instead. The workflow: place
+> the arm at a repeatable reference pose (a printed jig, or eyeballed against
+> a marked configuration), `ENABLE` so the drivers hold it there, then send
+> `SETHOME θ₁ θ₂ θ₃` with that pose's angles — the firmware zeroes the step
+> counters to those angles and marks the arm homed. Re-run after every
+> `DISABLE` (unpowered steppers slip and the datum is lost). The datum is
+> only as accurate as the placement, so invest in a real reference jig if you
+> care about repeatability. The switch-based stages below (2, and the seek in
+> 3–4) apply only if you later fit switches and wire them per the pin map.
+
 ### 1. Smoke test — no motors, no PSU
 
 Flash the ESP32 with nothing but USB connected. In the monitor:
@@ -201,8 +231,10 @@ never triggers means an open circuit or wrong pin.
 
 ### 3. First power — motors connected, arm NOT assembled
 
-Wire everything, set each driver's VREF, and clamp the motors to the bench
-(or leave them loose) — do not couple them to the arm yet.
+Wire everything, including the PDN_UART bus and the address straps (the
+firmware sets motor current at boot — no pots to adjust), and clamp the
+motors to the bench (or leave them loose) — do not couple them to the arm
+yet.
 
 ```
 ENABLE          → OK ENABLE      (motors should now hold — try turning a shaft by hand)
@@ -268,7 +300,8 @@ stay under the torque ceiling; that's normal for aggressive targets.
 | `PING` | — | liveness check, returns firmware name/version |
 | `STATE` | — | current mode, pose, homed/enabled flags |
 | `ENABLE` / `DISABLE` | — | energize / de-energize drivers. **DISABLE drops the homed flag** (unpowered steppers slip under gravity) — re-HOME after |
-| `HOME` | — | joint-by-joint homing per `homing_order` |
+| `HOME` | — | joint-by-joint homing per `homing_order` (**requires limit switches**) |
+| `SETHOME` | θ₁ θ₂ θ₃ (deg) | manual datum — declare the arm's current pose as home (no switches) |
 | `MOVEJ` | θ₁ θ₂ θ₃ (deg) | joint-space move |
 | `MOVEL` | x y z (mm) | straight-line Cartesian move via analytic IK |
 | `STOP` | — | immediate halt; clears FAULT |
@@ -280,10 +313,11 @@ stay under the torque ceiling; that's normal for aggressive targets.
 | Symptom | Likely cause |
 |---|---|
 | Motor whines/holds but won't step | STEP/DIR swapped, or STEP pin miswired |
-| Moves land at exactly ½ / 2× / 4× the commanded angle | MS1/MS2 straps don't match `microstepping: 16` |
+| Moves land at exactly ½ / 2× / 4× the commanded angle | the UART config never reached that driver (PDN bus wiring, wrong address strap) so it's running its pin-strap default resolution |
+| One motor weak/silent while others behave; or two joints act identically | duplicate or wrong MS1/MS2 address straps — each driver needs a unique address (base 0, shoulder 1, elbow 2) |
 | Joint seeks away from its switch | flip `invert_dir` (wrong rotation) or `seek_dir` (wrong search direction) |
 | `ERR NOT_HOMED` on every move | run `HOME` first; also re-HOME after any `DISABLE` |
 | Homing faults after 30 s | switch not wired / not in the seek path; `STOP` clears the fault |
 | Motors stutter or drivers reset under load | missing VM capacitor, undersized PSU, or missing common ground |
-| Skipped steps on fast moves | VREF too low, or `motor.holding_torque_nm` in `robot.yaml` optimistic — the governor can only respect the torque it's told about |
+| Skipped steps on fast moves | `irun` too low, or `motor.holding_torque_nm` in `robot.yaml` optimistic — the governor can only respect the torque it's told about |
 | ESP32 resets when motors enable | motor PSU current sagging into the USB ground path — check grounding and PSU capacity |

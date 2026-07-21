@@ -12,12 +12,14 @@ for one robot with no spares unless noted.
 | Item | Qty | Notes |
 |---|---|---|
 | NEMA 17 stepper, 17HS4401 (5 mm D-shaft, ~40 mm body) | 3 | base direct drive, shoulder, elbow. The CAD assumes the measured 40 mm body and 23.5 mm usable shaft |
-| TMC2209 driver module | 3 | step/dir mode, shared EN; UART optional (`tmc_uart.enabled: false`) |
+| TMC2209 driver module | 3 | step/dir mode, shared EN; configured over single-wire UART at boot (`tmc_uart.enabled: true` — current and microstepping come from `firmware.yaml`, VREF pots unused) |
 | Electrolytic capacitor ≥100 µF, ≥35 V | 3 | one across VM per driver |
 
 **A4988 substitution:** needs one firmware tweak — the step engine's STEP
 pulses are tens of ns (fine for the TMC2209's 100 ns minimum, below the
-A4988's 1 µs), so `step_engine.cpp` must stretch them first. Otherwise
+A4988's 1 µs), so `step_engine.cpp` must stretch them first — and set
+`tmc_uart.enabled: false` (the A4988 has no UART; straps and pots take
+over). Otherwise
 the interface matches: the firmware drives step/dir/enable only, EN is
 active-low on both, and `robot.yaml motor.microstepping: 16` is exactly
 the A4988's maximum
@@ -32,8 +34,8 @@ DRV8825 is the same story with more current headroom (1/16 also available).
 
 | Item | Qty | Notes |
 |---|---|---|
-| 608-2RS bearing (8×22×7) | 4 | two per driven arm hub (dead axle: outer races in the hub, inner races on the static shaft) |
-| 6805-2RS bearing (25×37×7) | 1 | yaw support in the base pan |
+| 608-2RS bearing (8×22×7) | 2 | one per +Y ear (live shaft: outer race in the ear, inner race on the spinning shaft) |
+| 6805-2RS bearing (25×37×7) | 3 | yaw support in the base pan + one per drive ear, riding the gearbox output's Ø25.05 seat |
 | 6802-2RS bearing (15×24×5) | 4 | two per gearbox, on the eccentric cam |
 | 8 mm hardened steel shaft, **cut to 68 mm** | 2 | see "Shaft preparation" below |
 | 8 mm set-screw shaft collar (~Ø18×9) | 2 | outboard axial keeper, one per pitch joint |
@@ -41,15 +43,18 @@ DRV8825 is the same story with more current headroom (1/16 also available).
 
 ### Shaft preparation (per shaft, ×2)
 
-- **Cut to 68 mm. That is all** — the shaft is a *static, torque-free
-  axle* since the dead-axle rev: the arm hub rides it on the two 608s and
-  torque enters the arm through the gearbox output's drive sleeve, so
-  there is no flat to grind and nothing clamps onto the rod.
-- Length derivation (functional 67.5): ear-outer-face span 51.5
-  (2 × EAR_OUT) + 9 mm collar outboard of the +Y ear + 7 mm tip reach
-  into the gearbox output's Ø8.4 journal; the spare 0.5 mm disappears
-  into the journal's 1 mm depth margin. If the linkage or casing changes,
-  re-read `shaft_len` from `linkage_geometry.py`'s dry-run output.
+- **Cut to 68 mm; no flats** — shafts cut for the dead-axle rev are
+  reused unmodified. Since the live-shaft rev (v5) the shaft **is the
+  torque path**: it spins with the arm, clamped at both ends by split
+  pinches (gearbox output extension on −Y, arm hub on +Y side of the
+  span). **Degrease before assembly** — both couplings are friction
+  clamps on polished rod; a drop of Loctite 638 in each bore is cheap
+  insurance against creep-slip.
+- Length derivation (functional 68.0): collar 9 outboard of the +Y ear
+  face (25.75) + drive-ear outer face at 35.5 − 2.25 (tip stops shy of
+  the gearbox lid face, ~19.5 mm deep in the output's bore). If the
+  linkage or casing changes, re-read `shaft_len` from
+  `linkage_geometry.py`'s dry-run output.
 
 ## Fasteners
 
@@ -63,7 +68,8 @@ M3 socket head throughout. An M3 assortment box (6–40 mm) plus the specific
 | M3 × 8 | 16 | gearbox cup → motor (2×4), base pan → motor (4), optional hub → sleeve axial locks (2, self-tap into the flat's Ø2.5 pilot), spares |
 | M3 × 10 | 4 | column plate → coupling |
 | gripper screws (M3 × 8 ×10) | — | per the table in `engineering/gripper/README.md` |
-| M3 × 20 + nut | 1 | base shaft-coupling cross-bolt |
+| M3 × 20 + nut | 5 | base shaft-coupling cross-bolt (1) + arm-hub pinch bolts (2 per hub) |
+| M3 × 16 + nut | 2 | gearbox-output pinch bolts, one per output |
 | M3, length to suit the bench | 4 | pan table mount (Ø120 BCD) |
 
 ## Electronics
@@ -71,9 +77,9 @@ M3 socket head throughout. An M3 assortment box (6–40 mm) plus the specific
 | Item | Qty | Notes |
 |---|---|---|
 | ESP32 DevKit (WROOM-32) | 1 | pins per `config/firmware.yaml` |
-| Limit switch (lever microswitch) | 3 | one per joint, active-low to GND, internal pull-ups |
+| Limit switch (lever microswitch) | 3 | **optional** — only for switch-seek `HOME`; this build datums with `SETHOME` (manual pose). Active-low to GND, internal pull-ups |
 | Motor PSU, 12–24 V | 1 | ≥5 A at 12 V for three motors; 24 V preferred for speed headroom |
-| 1 kΩ resistor | 1 | only if enabling the TMC2209 UART (TX → PDN_UART) |
+| 1 kΩ resistor | 1 | TMC2209 UART bus: ESP32 GPIO26 (TX) → shared PDN_UART line |
 | Hookup wire, dupont/JST, USB cable | — | UART0 console at 115200 |
 
 ## Gripper (designed — see `engineering/gripper/`)

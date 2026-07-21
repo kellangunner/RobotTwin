@@ -116,6 +116,34 @@ CmdResult MotionController::home() {
   return {};
 }
 
+CmdResult MotionController::setHome(const rt::JointAngles& q) {
+  CmdResult r;
+  if (!guard(r, /*needHomed=*/false)) return r;
+
+  // Manual datum: the operator has physically placed the arm at q right now
+  // (a jig or an eyeballed reference pose), so zero the step counters to it
+  // and declare homed. This is the switchless answer for an arm with no
+  // endstops — the datum is exactly as accurate as the placement. Requires
+  // ENABLE first (the drivers must be holding the jigged pose), and must be
+  // re-run after any DISABLE, which drops the datum because unpowered
+  // steppers slip. Angles must be inside the joint limits.
+  for (int j = 0; j < rt::kNumJoints; ++j) {
+    const auto& lim = robot_.limits[j];
+    if (q[j] < lim.min || q[j] > lim.max)
+      return err(kLimits, std::string(rt::jointName(static_cast<rt::Joint>(j))) +
+                              " outside joint limits");
+  }
+
+  portENTER_CRITICAL(&mux_);
+  for (int j = 0; j < rt::kNumJoints; ++j) steps_->setPosition(j, radToSteps(j, q[j]));
+  homed_ = true;
+  mode_ = Mode::Idle;
+  portEXIT_CRITICAL(&mux_);
+
+  postEvent("HOMED", "manual datum");
+  return {};
+}
+
 CmdResult MotionController::moveJoints(const rt::JointAngles& q) {
   CmdResult r;
   if (!guard(r, /*needHomed=*/true)) return r;

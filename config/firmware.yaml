@@ -30,15 +30,20 @@ driver_enable:               # one EN line shared by all three TMC2209s
   pin: 23
   active_low: true
 
-# Optional single-wire UART to the TMC2209s (TX through a 1k resistor to the
-# shared PDN_UART line; drivers are addressed by their MS1/MS2 straps).
-# When disabled, drivers run on their pin-strap defaults and the microstepping
-# below MUST match robot.yaml motor.microstepping by wiring.
+# Single-wire UART to the TMC2209s — ENABLED: boot programs microstepping
+# (CHOPCONF, from robot.yaml motor.microstepping) and run/hold current
+# (IHOLD_IRUN) into each driver, so the VREF pots are ignored. TX runs
+# through a 1k resistor to the shared PDN_UART line; drivers are addressed
+# by their MS1/MS2 straps (base 0, shoulder 1, elbow 2 — see uart_address
+# per joint). Write-only: nothing is read back; step/dir stays the only
+# motion path. If ever set back to false, the MS1/MS2 straps revert to
+# microstep-select and MUST match robot.yaml by wiring.
 tmc_uart:
-  enabled: false
+  enabled: true
   tx_pin: 26
   baud: 115200
-  irun: 16                   # run current scale 0..31 (31 = full scale)
+  irun: 16                   # run current scale 0..31 (31 = full scale);
+                             # ~0.9-1.0 A RMS with typical 110 mOhm sense
   ihold: 8                   # standstill current scale 0..31
 
 # Homing runs joint-by-joint in this order. Elbow first assumes the arm is
@@ -47,8 +52,8 @@ homing_order: [elbow, shoulder, base]
 
 joints:
   base:
-    step_pin: 16
-    dir_pin: 17
+    step_pin: 4              # was 16 — some DevKits (e.g. 30-pin ELEGOO) omit GPIO16/17
+    dir_pin: 27             # was 17 — moved with STEP (16/17 are dropped as a pair)
     invert_dir: false
     uart_address: 0          # TMC2209 MS1/MS2 strap address (0..3)
     limit:
