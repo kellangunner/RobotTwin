@@ -15,9 +15,6 @@ From the [BOM](BOM.md) electronics section:
 - 3 × TMC2209 stepper driver modules (StepStick/BTT-style carriers)
 - 3 × NEMA 17 steppers (17HS4401 or similar, 4-wire bipolar)
 - 3 × electrolytic capacitors, ≥100 µF ≥35 V (one across VM per driver)
-- 3 × lever microswitches (limit switches, one per joint) — **optional**: only
-  needed for switch-seek `HOME`; this build datums with `SETHOME` (see the
-  homing note in the bring-up procedure)
 - Motor PSU: 12–24 V DC, ≥5 A at 12 V (24 V preferred for speed headroom)
 - USB cable (powers the ESP32 and carries the serial console)
 - Hookup wire; 1 × 1 kΩ resistor for the TMC2209 UART bus (TX → PDN_UART)
@@ -51,8 +48,12 @@ Rules that prevent dead drivers:
 ## Pin map
 
 All values from `config/firmware.yaml`. Step/dir/enable must stay below
-GPIO32 (the step ISR writes the low GPIO bank's registers); limit switches
-may use any input-capable pin.
+GPIO32 (the step ISR writes the low GPIO bank's registers).
+
+This arm has **no limit switches** — it has none designed in, and no hard
+stops to mount them against — so nothing is wired to a switch input and the
+datum is set manually with `SETHOME` (see the bring-up procedure). GPIO32/33/25
+are consequently free.
 
 > The base joint uses GPIO4/GPIO27 rather than the GPIO16/GPIO17 you'll see
 > on many WROOM-32 pinout diagrams: some DevKits (the 30-pin ELEGOO board
@@ -70,14 +71,11 @@ may use any input-capable pin.
 | Elbow STEP | 21 | elbow driver STEP |
 | Elbow DIR | 22 | elbow driver DIR |
 | Driver ENABLE (shared) | 23 | EN on **all three** drivers (active-low) |
-| Base limit switch | 32 | switch → GND (active-low, internal pull-up) |
-| Shoulder limit switch | 33 | switch → GND |
-| Elbow limit switch | 25 | switch → GND |
 | TMC UART TX | 26 | 1 kΩ → shared PDN_UART line, all three drivers |
 
 GPIO 13 is reserved for the future gripper axis — one 50 Hz servo-PWM
-channel for its SG-90 (no driver, no limit switch; budget ~650 mA of 5 V
-stall transient). Leave it free.
+channel for its SG-90 (no driver; budget ~650 mA of 5 V stall transient).
+Leave it free. GPIO32/33/25 are unused (no limit switches).
 
 ```
                  ESP32 DevKit (WROOM-32)
@@ -91,9 +89,6 @@ stall transient). Leave it free.
                 │ GPIO21 ─ STEP ┐       │
                 │ GPIO22 ─ DIR  ├─ elbow driver
                 │ GPIO23 ─ EN ──┴─┴─┴─ EN on all three (active-low)
-                │ GPIO32 ◄── base limit ──── GND
-                │ GPIO33 ◄── shoulder limit ─ GND
-                │ GPIO25 ◄── elbow limit ─── GND
                 │ GPIO26 ─ 1kΩ ─ PDN_UART bus (all three)
                 └───────────────────────┘
 
@@ -160,18 +155,6 @@ Fallback for reference: if `tmc_uart.enabled` is ever set back to false,
 the straps revert to hardware microstep-select (both MS1 and MS2 high =
 1/16) and the VREF pot rules current again.
 
-## Limit switches
-
-One lever microswitch per joint, wired **normally-open between the GPIO and
-GND** — two wires, no resistor needed (the firmware enables internal
-pull-ups; `active_low: true`). Closing the switch pulls the pin low.
-
-Mount each switch so the joint trips it at the angle configured as
-`home_angle_deg` in `firmware.yaml` (base −135°, shoulder +90° = arm
-vertical, elbow −150°). These values are bring-up placeholders — measure the
-real trip angle after mounting and update the YAML to match; homing accuracy
-is exactly as good as that number.
-
 ## Flashing the firmware
 
 The firmware builds with PlatformIO (espressif32 + ESP-IDF). Install it if
@@ -190,25 +173,17 @@ to `config/firmware.yaml` or `config/robot.yaml` requires a rebuild and
 reflash** — but never a code change.
 
 > Note: the firmware builds cleanly but has not yet been run on real
-> hardware. Expect to iterate on homing values and current settings during
-> bring-up.
+> hardware. Expect to iterate on the datum reference pose and current
+> settings during bring-up.
 
 ## Bring-up procedure
 
 Work through these stages in order; each one only risks what the previous
 stage verified.
 
-> **Homing without limit switches (this build).** The arm as designed has no
-> limit switches and no hard stops, so the switch-seek `HOME` command isn't
-> usable — this build datums with **`SETHOME`** instead. The workflow: place
-> the arm at a repeatable reference pose (a printed jig, or eyeballed against
-> a marked configuration), `ENABLE` so the drivers hold it there, then send
-> `SETHOME θ₁ θ₂ θ₃` with that pose's angles — the firmware zeroes the step
-> counters to those angles and marks the arm homed. Re-run after every
-> `DISABLE` (unpowered steppers slip and the datum is lost). The datum is
-> only as accurate as the placement, so invest in a real reference jig if you
-> care about repeatability. The switch-based stages below (2, and the seek in
-> 3–4) apply only if you later fit switches and wire them per the pin map.
+The arm has no limit switches, so the datum is set manually with `SETHOME`:
+you place the arm at a known reference pose, `ENABLE` so the drivers hold it,
+then declare that pose's angles. It stays valid until the next `DISABLE`.
 
 ### 1. Smoke test — no motors, no PSU
 
@@ -222,14 +197,7 @@ STATE           → current mode / pose / flags
 If PING answers, the boot chain (config parse, step engine, console) is
 alive.
 
-### 2. Limit switches — still no motor power
-
-With only the switches wired, press each one by hand and confirm the firmware
-sees it (check `STATE`, or watch for the homing seek reacting in stage 4).
-A switch that reads triggered while released means a wiring short; one that
-never triggers means an open circuit or wrong pin.
-
-### 3. First power — motors connected, arm NOT assembled
+### 2. First power — motors connected, arm NOT assembled
 
 Wire everything, including the PDN_UART bus and the address straps (the
 firmware sets motor current at boot — no pots to adjust), and clamp the
@@ -241,43 +209,31 @@ ENABLE          → OK ENABLE      (motors should now hold — try turning a sha
 DISABLE         → OK DISABLE     (shafts turn freely again)
 ```
 
-Enable, then home:
+Confirm each motor holds under `ENABLE` and spins freely under `DISABLE`. If a
+motor whines but won't hold, or a commanded direction is reversed, note it —
+`invert_dir` in `firmware.yaml` fixes direction later.
+
+### 3. Assembled arm — first datum with SETHOME
+
+Mount the motors, couple the gearboxes, and place the arm at your **reference
+pose** — a repeatable configuration you can hit accurately, ideally a printed
+alignment jig (eyeballing works but the datum is only as good as the
+placement). Keep a hand near the PSU switch.
 
 ```
-HOME            → seeks each joint toward its switch (elbow, shoulder, base order)
+ENABLE                       → drivers energize and hold the arm at the placed pose
+SETHOME <θ1> <θ2> <θ3>       → EV HOMED manual datum   (angles of your reference pose, deg)
 ```
 
-With motors on the bench nothing trips the switches, so trip each one **by
-hand** during its seek and watch the sequence: fast seek → back off → slow
-re-seek → back off. If a motor seeks *away* from where its switch would be,
-flip that joint's `invert_dir` in `firmware.yaml` and reflash. If a joint
-seeks correctly but you want the switch on the other side, flip `seek_dir`
-instead.
+`SETHOME` zeroes the step counters to the angles you gave and marks the arm
+homed. Re-run it after **every** `DISABLE` — unpowered steppers slip under
+gravity, so the datum is dropped on disable by design. Verify it: command a
+small move you can eyeball and measure the real angles; if they disagree, your
+placement was off — re-place and `SETHOME` again.
 
-If a switch never trips, the per-joint watchdog (`homing_timeout_s: 30`)
-faults the controller — `STOP` clears the FAULT.
+### 4. First moves
 
-### 4. Assembled arm — first homing
-
-Mount the motors, couple the gearboxes, and rack the arm **roughly upright**
-before power-on (the homing order `elbow → shoulder → base` assumes it).
-Keep a hand near the PSU switch.
-
-```
-ENABLE
-HOME            → EV HOMING elbow … EV HOMED
-```
-
-Watch the first homing at arm's length. If a joint drives the wrong way or
-into a hard stop, kill power, fix `invert_dir`/`seek_dir`, reflash.
-
-After a successful home, verify the datum: command a pose you can eyeball
-and measure the real angles. Adjust each `home_angle_deg` until commanded
-and physical angles agree.
-
-### 5. First moves
-
-Moves are refused with `ERR NOT_HOMED` until homing succeeds — that's the
+Moves are refused with `ERR NOT_HOMED` until you `SETHOME` — that's the
 firmware protecting you, not a bug.
 
 ```
@@ -299,9 +255,9 @@ stay under the torque ceiling; that's normal for aggressive targets.
 |---|---|---|
 | `PING` | — | liveness check, returns firmware name/version |
 | `STATE` | — | current mode, pose, homed/enabled flags |
-| `ENABLE` / `DISABLE` | — | energize / de-energize drivers. **DISABLE drops the homed flag** (unpowered steppers slip under gravity) — re-HOME after |
-| `HOME` | — | joint-by-joint homing per `homing_order` (**requires limit switches**) |
-| `SETHOME` | θ₁ θ₂ θ₃ (deg) | manual datum — declare the arm's current pose as home (no switches) |
+| `ENABLE` / `DISABLE` | — | energize / de-energize drivers. **DISABLE drops the homed flag** (unpowered steppers slip under gravity) — re-`SETHOME` after |
+| `SETHOME` | θ₁ θ₂ θ₃ (deg) | set the datum — declare the arm's current pose as home. The datum method for this build |
+| `HOME` | — | switch-seek homing (needs limit switches — **not fitted on this arm**; use `SETHOME`) |
 | `MOVEJ` | θ₁ θ₂ θ₃ (deg) | joint-space move |
 | `MOVEL` | x y z (mm) | straight-line Cartesian move via analytic IK |
 | `STOP` | — | immediate halt; clears FAULT |
@@ -315,9 +271,9 @@ stay under the torque ceiling; that's normal for aggressive targets.
 | Motor whines/holds but won't step | STEP/DIR swapped, or STEP pin miswired |
 | Moves land at exactly ½ / 2× / 4× the commanded angle | the UART config never reached that driver (PDN bus wiring, wrong address strap) so it's running its pin-strap default resolution |
 | One motor weak/silent while others behave; or two joints act identically | duplicate or wrong MS1/MS2 address straps — each driver needs a unique address (base 0, shoulder 1, elbow 2) |
-| Joint seeks away from its switch | flip `invert_dir` (wrong rotation) or `seek_dir` (wrong search direction) |
-| `ERR NOT_HOMED` on every move | run `HOME` first; also re-HOME after any `DISABLE` |
-| Homing faults after 30 s | switch not wired / not in the seek path; `STOP` clears the fault |
+| Joint moves the wrong direction | flip that joint's `invert_dir` in `firmware.yaml` and reflash |
+| `ERR NOT_HOMED` on every move | run `SETHOME` first; also re-`SETHOME` after any `DISABLE` |
+| Datum drifts / moves land off by a constant offset | reference-pose placement was inaccurate — re-place the arm and `SETHOME` again (a jig helps) |
 | Motors stutter or drivers reset under load | missing VM capacitor, undersized PSU, or missing common ground |
 | Skipped steps on fast moves | `irun` too low, or `motor.holding_torque_nm` in `robot.yaml` optimistic — the governor can only respect the torque it's told about |
 | ESP32 resets when motors enable | motor PSU current sagging into the USB ground path — check grounding and PSU capacity |

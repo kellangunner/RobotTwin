@@ -65,8 +65,7 @@ Requirements, not a shopping list — buy whatever meets them:
   breadboards placed side by side** (inner rails removed from play) for
   full hole access on both sides. One extra cheap board beats fighting a
   too-wide module.
-- Solid-core jumper kit (22 AWG) and a few Dupont leads for the switches
-  and motors.
+- Solid-core jumper kit (22 AWG) and a few Dupont leads for the motors.
 
 ## Rail conventions used below
 
@@ -86,18 +85,20 @@ works:
 | # | From | To |
 |---|---|---|
 | 1 | ESP32 3V3 | 3V3 rail → each driver's VIO, MS straps per table below |
-| 2 | ESP32 GND | logic-GND rail → each driver's logic-GND pin, switch commons, PSU − (one reference jumper) |
+| 2 | ESP32 GND | logic-GND rail → each driver's logic-GND pin, PSU − (one reference jumper) |
 | 3 | ESP32 D23 | EN on **all three** drivers (daisy-chain) |
 | 4 | ESP32 D4 / D27 | base driver STEP / DIR |
 | 5 | ESP32 D18 / D19 | shoulder driver STEP / DIR |
 | 6 | ESP32 D21 / D22 | elbow driver STEP / DIR |
 | 7 | ESP32 D26 → **1 kΩ resistor** | PDN_UART on all three drivers, bussed |
-| 8 | ESP32 D32 / D33 / D25 | base / shoulder / elbow limit switch (other leg of each switch → logic GND) |
-| 9 | PSU + / PSU − | each driver's VM / GND (motor side), with a **100 µF cap** (+ to VM) at each driver |
-| 10 | Motor coils | one coil pair to the driver's A outputs, the other to its B outputs (labels vary by brand — 1A/1B/2A/2B on most carriers) |
+| 8 | PSU + / PSU − | each driver's VM / GND (motor side), with a **100 µF cap** (+ to VM) at each driver |
+| 9 | Motor coils | one coil pair to the driver's A outputs, the other to its B outputs (labels vary by brand — 1A/1B/2A/2B on most carriers) |
 
-Leave empty: ESP32 VIN (USB powers the board — **never** the motor PSU),
-D13 (reserved for the future gripper servo), driver CLK pins if present.
+This arm has **no limit switches** (none designed in, no hard stops to mount
+them against); the datum is set in firmware with `SETHOME`, so nothing wires
+to a switch input. Leave empty: ESP32 VIN (USB powers the board — **never**
+the motor PSU), D13 (reserved for the future gripper servo), GPIO32/33/25
+(free — no switches), driver CLK pins if present.
 
 ## ESP32 module
 
@@ -105,12 +106,9 @@ D13 (reserved for the future gripper servo), driver CLK pins if present.
    board edge so the cable fits.
 2. Find 3V3 and GND on the silkscreen. 3V3 → red rail; GND → blue rail;
    bridge the two blue rails at the far end.
-3. Limit switches: two wires each, polarity-free — one leg into the free
-   hole beside D32 (base), D33 (shoulder), D25 (elbow); other leg → blue
-   rail.
-4. UART resistor: 1 kΩ from the free hole beside D26 to any empty row;
+3. UART resistor: 1 kΩ from the free hole beside D26 to any empty row;
    from that row, one jumper leaves for the driver PDN bus (net 7).
-5. Signal jumpers for nets 3–6 leave from the free holes beside D23,
+4. Signal jumpers for nets 3–6 leave from the free holes beside D23,
    D4, D27 (base), D18/D19 (shoulder), D21/D22 (elbow).
 
 ## Driver modules (three TMC2209s)
@@ -172,9 +170,8 @@ the logic daisy-chain.
    landing against the silkscreen, cap polarity, and that the three
    address straps are all different.
 2. USB in, PSU still off → stage-1 smoke test (`PING`) from
-   [wiring-and-bringup.md](wiring-and-bringup.md); press each limit
-   switch and confirm via `STATE`.
+   [wiring-and-bringup.md](wiring-and-bringup.md).
 3. PSU on, motors loose on the bench → `ENABLE`, feel for holding torque,
-   run the hand-trip homing test.
+   then set the datum with `SETHOME` (this arm has no switches).
 4. Anything hot to the touch within seconds → power off and find the
    miswire before it finds the driver.
