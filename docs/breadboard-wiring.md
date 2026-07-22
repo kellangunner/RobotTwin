@@ -7,7 +7,9 @@ depends on which boards you own or where a module happens to sit. Signals
 and pin numbers come from [`config/firmware.yaml`](../config/firmware.yaml)
 (UART mode enabled: MS1/MS2 are address straps, current is programmed at
 boot). The bring-up *procedure* stays in
-[wiring-and-bringup.md](wiring-and-bringup.md).
+[wiring-and-bringup.md](wiring-and-bringup.md). For the specific
+dovetailed two-board bench with hole-by-hole instructions, see
+[breadboard-step-by-step.md](breadboard-step-by-step.md).
 
 ## Read this first — current limits
 
@@ -139,9 +141,12 @@ Per driver:
    | shoulder | 1 | **high** | low |
    | elbow | 2 | low | **high** |
 
-5. PDN_UART (if your carrier has two, they're tied — use either) joins
-   the bus from the ESP32's 1 kΩ resistor; daisy-chain it onward from a
-   free hole in the same row. CLK, if present, stays empty.
+5. PDN_UART joins the bus from the ESP32's 1 kΩ resistor; daisy-chain it
+   onward from a free hole in the same row. If your carrier breaks the pin
+   out twice, check the labels: two pads both marked PDN are the same net —
+   use either; pads split into **TX and RX** are two legs of the interface —
+   the bus wire goes to **RX** (this build's UART is write-only) and TX
+   stays empty. CLK, if present, stays empty.
 6. EN joins the D23 daisy-chain the same way: jumper in from the previous
    driver, jumper out to the next.
 7. STEP and DIR: jumpers from the matching ESP32 pins (nets 4–6).

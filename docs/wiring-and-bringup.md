@@ -24,7 +24,9 @@ connections for anything that moves — a step pin that loses contact mid-move
 means lost steps the firmware cannot detect. For a bench rig, there is a
 board-agnostic breadboard layout (net list + per-module rules, works on
 any boards) in [breadboard-wiring.md](breadboard-wiring.md) (drop `irun`
-so phase current stays ≤ 0.8 A on breadboards).
+so phase current stays ≤ 0.8 A on breadboards), and a hole-by-hole
+step-by-step build for the dovetailed two-board bench in
+[breadboard-step-by-step.md](breadboard-step-by-step.md).
 
 ## Power architecture
 
@@ -56,8 +58,9 @@ datum is set manually with `SETHOME` (see the bring-up procedure). GPIO32/33/25
 are consequently free.
 
 > The base joint uses GPIO4/GPIO27 rather than the GPIO16/GPIO17 you'll see
-> on many WROOM-32 pinout diagrams: some DevKits (the 30-pin ELEGOO board
-> among them) don't break those two out. GPIO4/27 are the free, non-strapping,
+> on many WROOM-32 pinout diagrams: some 30-pin DevKit revisions don't break
+> those two out (the ELEGOO DevKit V1 TypeC does, labeled RX2/TX2 — the
+> config keeps 4/27 so either works). GPIO4/27 are the free, non-strapping,
 > sub-GPIO32 pins that satisfy the same constraints; GPIO14 is the remaining
 > spare. If your board *does* expose 16/17 and you'd rather use them, change
 > `joints.base.step_pin`/`dir_pin` in `firmware.yaml` and reflash.
