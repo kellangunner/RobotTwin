@@ -1,7 +1,7 @@
-// Boot-time access to the YAML configs embedded in the firmware image
-// (EMBED_TXTFILES in components/robottwin_core). The robot has no filesystem;
-// the config text is baked into flash and parsed by the same loaders the
-// native builds use.
+// Boot-time access to the YAML configs baked into the firmware image
+// (src/embedded_yaml_gen.hpp, generated from config/*.yaml at build time by
+// scripts/gen_embedded_configs.py). The robot has no filesystem; the config
+// text lives in flash and is parsed by the same loaders the native builds use.
 #pragma once
 
 #include "config/config.hpp"

@@ -1,10 +1,8 @@
 #include "embedded_configs.hpp"
 
 #include "config/load.hpp"
-
-// EMBED_TXTFILES null-terminates, so the blobs read as C strings.
-extern const char kRobotYaml[] asm("_binary_robot_yaml_start");
-extern const char kFirmwareYaml[] asm("_binary_firmware_yaml_start");
+#include "embedded_yaml_gen.hpp"  // kRobotYaml / kFirmwareYaml — generated from
+                                  // config/*.yaml by scripts/gen_embedded_configs.py
 
 namespace fw {
 

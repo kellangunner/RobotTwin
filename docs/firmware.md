@@ -10,7 +10,7 @@ a command the twin would slow down is slowed by the same stretch factor.
 
 Hardware: ESP32 DevKit (WROOM-32) + three TMC2209 drivers in step/dir mode, one shared enable
 line, one limit switch per joint. Board wiring lives in `config/firmware.yaml`; the robot itself
-in `config/robot.yaml`. Both are embedded into the flash image at build time (`EMBED_TXTFILES`)
+in `config/robot.yaml`. Both are baked into the flash image at build time (a generated header — `firmware/scripts/gen_embedded_configs.py`)
 and parsed at boot by the same loaders the native tests exercise — a pin change is a config edit
 plus reflash, never a code change.
 

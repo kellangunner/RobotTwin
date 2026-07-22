@@ -1,0 +1,5 @@
+# PlatformIO build tree
+.pio/
+
+# Generated from config/*.yaml at build time (scripts/gen_embedded_configs.py)
+src/embedded_yaml_gen.hpp
