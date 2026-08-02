@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_DWELL,
+  describeMove,
   makeMove,
   parseProgramCsv,
   programToCsv,
@@ -17,11 +18,21 @@ describe('parseProgramCsv', () => {
   });
 
   it('honours a per-row kind tag, so mixed programs round-trip', () => {
-    const { moves, skipped } = parseProgramCsv('J,0,90,-90,0.5\nC,150,0,150,1.5\n', 'cartesian');
+    const { moves, skipped } = parseProgramCsv(
+      'J,0,90,-90,0.5\nC,150,0,150,1.5\nP,200,45,150,0.2\n',
+      'cartesian',
+    );
     expect(skipped).toBe(0);
-    expect(moves.map((m) => m.kind)).toEqual(['joints', 'cartesian']);
-    expect(moves[0].dwell).toBe(0.5);
-    expect(moves[1].dwell).toBe(1.5);
+    expect(moves.map((m) => m.kind)).toEqual(['joints', 'cartesian', 'polar']);
+    expect(moves.map((m) => m.dwell)).toEqual([0.5, 1.5, 0.2]);
+  });
+
+  it('accepts the spelled-out kind aliases', () => {
+    const { moves } = parseProgramCsv(
+      'polar,200,45,150\ncylindrical,180,0,140\ncartesian,150,0,150\njoints,0,90,-90\n',
+      'cartesian',
+    );
+    expect(moves.map((m) => m.kind)).toEqual(['polar', 'polar', 'cartesian', 'joints']);
   });
 
   it('skips comments and tolerates one leading header row', () => {
@@ -54,6 +65,7 @@ describe('parseProgramCsv', () => {
   it('round-trips through programToCsv, disabled rows included', () => {
     const original = [
       makeMove('joints', [0, 90, -90], 0.5),
+      makeMove('polar', [200, -45, 150], 0.4),
       { ...makeMove('cartesian', [150, 0, 150], 1.2), enabled: false },
     ];
     const { moves, skipped } = parseProgramCsv(programToCsv(original), 'cartesian');
@@ -74,11 +86,11 @@ describe('programToRobotScript', () => {
     expect(commands).toEqual(['MOVEJ 0.00 90.00 -90.00', 'SLEEP 0.50', 'MOVEJ 30.00 60.00 -45.00']);
   });
 
-  it('sends validated joint angles for a Cartesian row, keeping the target as a note', () => {
+  it('sends validated joint angles for a positional row, keeping the target as a note', () => {
     const script = programToRobotScript([
-      { anglesDeg: [0, 45, -30], dwell: 0, cartesianMm: [150, 0, 150] },
+      { anglesDeg: [0, 45, -30], dwell: 0, note: describeMove(makeMove('polar', [200, 45, 150])) },
     ]);
-    expect(script).toContain('# target x=150.0 y=0.0 z=150.0 mm');
+    expect(script).toContain('# target r=200.0 mm θ=45.0° z=150.0 mm');
     expect(script).toContain('MOVEJ 0.00 45.00 -30.00');
     expect(script).not.toContain('MOVEL');
   });

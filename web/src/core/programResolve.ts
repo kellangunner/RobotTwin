@@ -11,7 +11,7 @@ import { checkPose, inverseKinematics } from './api';
 import type { RobotConfig } from './config';
 import { JOINT_NAMES } from './config';
 import type { IkBranch, JointAngles } from './kinematics';
-import type { ProgramMove } from './program';
+import type { MoveKind, ProgramMove } from './program';
 import { deg2rad, mm2m, rad2deg } from './units';
 
 export type MoveResolution =
@@ -30,6 +30,34 @@ export interface ProgramResolution {
   /** Per-row outcome for the editor, including disabled and failed rows. */
   byId: Record<string, MoveResolution>;
   firstError: string | null;
+}
+
+/**
+ * A positional row as a world-frame TCP target in metres.
+ *
+ * Polar is cylindrical about the base yaw axis, matching the arm's own FK
+ * (`tcp = (r·cosθ1, r·sinθ1, z)`): r is planar reach, θ the base angle, z the
+ * height. A negative r is allowed and means "reach the other way" — the same
+ * point as (|r|, θ+180°) — because the base can yaw past ±90° and the IK
+ * already models that as the base-flipped branch.
+ */
+function toCartesian(move: ProgramMove): [number, number, number] {
+  const [a, b, c] = move.values;
+  if (move.kind === 'polar') {
+    const th = deg2rad(b);
+    return [mm2m(a * Math.cos(th)), mm2m(a * Math.sin(th)), mm2m(c)];
+  }
+  return [mm2m(a), mm2m(b), mm2m(c)];
+}
+
+/** The inverse of toCartesian, for capturing the current pose as a row. */
+export function fromCartesianMm(
+  kind: MoveKind,
+  xyzMm: [number, number, number],
+): [number, number, number] {
+  const [x, y, z] = xyzMm;
+  if (kind !== 'polar') return [x, y, z];
+  return [Math.hypot(x, y), rad2deg(Math.atan2(y, x)), z];
 }
 
 /**
@@ -62,7 +90,7 @@ export function resolveMove(
     return { ok: true, q, nearSingularity: false };
   }
 
-  const target = move.values.map(mm2m) as [number, number, number];
+  const target = toCartesian(move);
   const res = inverseKinematics(target, config.links, config.limits);
   if (!res.reachable) return { ok: false, reason: 'out of reach' };
 

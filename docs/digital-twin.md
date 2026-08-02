@@ -90,9 +90,23 @@ sliders *pose* the arm; the program is how you *command* it, and it is the twin'
 the physical robot actually works: a queue of moves, each planned, executed to completion, then
 held for a dwell before the next starts. Nothing follows the cursor.
 
-Each row is a Cartesian target (`x, y, z` mm, solved by IK with branch continuity chained from
-the previous row) or a joint target (`θ1, θ2, θ3` deg), plus a dwell and an enable flag. Rows
-resolve as you type — reach, joint limits and collision are reported inline per row — so an
+Each row is one of three frames, plus a dwell and an enable flag:
+
+| Badge | Frame | Values |
+|---|---|---|
+| `XYZ` | Cartesian | `x, y, z` mm — solved by IK, elbow branch chained from the previous row |
+| `RθZ` | Polar (cylindrical) | `r` mm, `θ` deg, `z` mm — about the base yaw axis |
+| `θ` | Joint space | `θ1, θ2, θ3` deg — commanded directly, no IK |
+
+Polar is the arm's own natural frame: FK is literally `tcp = (r·cosθ1, r·sinθ1, z)`, so `r` is
+planar reach, `θ` *is* the base angle, and `z` is height. Sweeping the base at fixed radius is
+one number here and two coupled ones in Cartesian — a program of `RθZ` rows differing only in
+`θ` exports as `MOVEJ` lines with identical shoulder and elbow angles. Negative `r` is legal and
+means the same point as `(|r|, θ+180°)`; the IK already models that as the base-flipped branch.
+Positional rows (`XYZ`, `RθZ`) share one code path — polar converts to Cartesian, then both go
+through the same IK, limit and collision gates.
+
+Rows resolve as you type — reach, joint limits and collision are reported inline per row — so an
 unreachable waypoint is something you see and fix, not something silently dropped at load time.
 
 `program.ts` is deliberately kinematics-free (rows, units, text round-trips) so it unit tests in
@@ -106,17 +120,19 @@ swept-path collision that only appears between two individually-safe waypoints s
 where it is and names the offending move. The final report aggregates the worst torque
 utilization across every leg.
 
-**Program I/O** — CSV rows are `[kind,] a, b, c [, dwell]`; the optional leading `J`/`C` tag lets
-a mixed program round-trip, and `!` before it marks a disabled row. Import *appends to the
-editor* rather than auto-running, so an imported file can be inspected and corrected first.
+**Program I/O** — CSV rows are `[kind,] a, b, c [, dwell]`; the optional leading `C`/`P`/`J` tag
+(or the spelled-out `cartesian`/`polar`/`joints`) lets a mixed program round-trip, and `!` before
+it marks a disabled row. Import *appends to the editor* rather than auto-running, so an imported
+file can be inspected and corrected first.
 
 Export as CSV (everything, disabled rows included) or as a **robot script** for
 `python/run_script.py` — only the enabled rows that resolved, emitted as `MOVEJ` with the joint
-angles the twin validated. Cartesian rows go out as joint angles too, with the target kept as a
-comment: the twin has already chosen an IK branch and proved that pose safe, so sending angles
-guarantees the hardware reproduces what was simulated instead of re-solving IK on the ESP32 and
-possibly landing on the other elbow branch. It also lets the runner split each move
-joint-by-joint for the shared-rail bench, which it cannot do for `MOVEL`.
+angles the twin validated. Positional rows go out as joint angles too, with the authored target
+kept as a comment: the twin has already chosen an IK branch and proved that pose safe, so sending
+angles guarantees the hardware reproduces what was simulated instead of re-solving IK on the
+ESP32 and possibly landing on the other elbow branch. It also lets the runner split each move
+joint-by-joint for the shared-rail bench, which it cannot do for `MOVEL` — and there is no polar
+verb on the wire at all, so `RθZ` rows could not round-trip any other way.
 
 ## Assumptions & limitations
 

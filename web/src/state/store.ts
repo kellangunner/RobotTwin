@@ -24,7 +24,7 @@ import type { DriveSelection } from '../core/gearboxModel';
 import type { JointAngles, Vec3, IkBranch } from '../core/kinematics';
 import type { MoveKind, ProgramMove } from '../core/program';
 import { DEFAULT_DWELL, MAX_DWELL, makeMove } from '../core/program';
-import { resolveProgram } from '../core/programResolve';
+import { fromCartesianMm, resolveProgram } from '../core/programResolve';
 import { retimeForTorque } from '../core/retime';
 import type { TrajectoryPlan } from '../core/trajectory';
 import { clamp, deg2rad, m2mm, rad2deg } from '../core/units';
@@ -534,7 +534,10 @@ export const useTwinStore = create<TwinState>((set, get) => {
         const values: [number, number, number] =
           kind === 'joints'
             ? (pose.map(rad2deg) as [number, number, number])
-            : (forwardKinematics(pose, config.links).tcp.map(m2mm) as [number, number, number]);
+            : fromCartesianMm(
+                kind,
+                forwardKinematics(pose, config.links).tcp.map(m2mm) as [number, number, number],
+              );
         return { program: [...s.program, makeMove(kind, values, DEFAULT_DWELL)] };
       }),
 

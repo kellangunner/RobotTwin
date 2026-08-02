@@ -9,16 +9,40 @@
 
 import { clamp } from './units';
 
-/** How a move's three numbers are interpreted. */
-export type MoveKind = 'cartesian' | 'joints';
+/**
+ * How a move's three numbers are interpreted.
+ *
+ * `polar` is cylindrical (r, θ, z) about the base yaw axis, which is the arm's
+ * own natural frame — FK is literally `tcp = (r·cosθ1, r·sinθ1, z)`, so r is
+ * the planar reach and θ *is* the base angle. Reaching "200 mm out, 45° round,
+ * 150 mm up" is one edit here and two coupled ones in Cartesian.
+ */
+export type MoveKind = 'cartesian' | 'polar' | 'joints';
+
+export const MOVE_KINDS: readonly MoveKind[] = ['cartesian', 'polar', 'joints'] as const;
+
+/** Axis names and units per kind, for labels and tooltips. */
+export const KIND_AXES: Record<MoveKind, readonly [string, string, string]> = {
+  cartesian: ['x (mm)', 'y (mm)', 'z (mm)'],
+  polar: ['r (mm)', 'θ (deg)', 'z (mm)'],
+  joints: ['θ1 (deg)', 'θ2 (deg)', 'θ3 (deg)'],
+};
+
+/** Short badge shown on each row. */
+export const KIND_BADGE: Record<MoveKind, string> = {
+  cartesian: 'XYZ',
+  polar: 'RθZ',
+  joints: 'θ',
+};
 
 export interface ProgramMove {
   id: string;
   kind: MoveKind;
   /**
-   * UI units, stored as typed: cartesian = x, y, z in mm; joints = θ1, θ2, θ3
-   * in degrees. Kept out of SI so editing and CSV/script export round-trip
-   * exactly instead of drifting through repeated deg↔rad conversions.
+   * UI units, stored as typed: cartesian = x, y, z in mm; polar = r mm, θ deg,
+   * z mm; joints = θ1, θ2, θ3 in degrees. Kept out of SI so editing and
+   * CSV/script export round-trip exactly instead of drifting through repeated
+   * deg↔rad conversions.
    */
   values: [number, number, number];
   /** Seconds to hold at this waypoint before the next move starts. */
@@ -81,7 +105,16 @@ const KIND_TOKENS: Record<string, MoveKind> = {
   movel: 'cartesian',
   xyz: 'cartesian',
   mm: 'cartesian',
+  p: 'polar',
+  pol: 'polar',
+  polar: 'polar',
+  cyl: 'polar',
+  cylindrical: 'polar',
+  rtz: 'polar',
 };
+
+/** CSV tag written for each kind; parsed back by KIND_TOKENS. */
+const KIND_TAG: Record<MoveKind, string> = { cartesian: 'C', polar: 'P', joints: 'J' };
 
 /**
  * Read a CSV/whitespace-delimited program. Rows are
@@ -143,15 +176,29 @@ function isNumeric(token: string | undefined): boolean {
   return token !== undefined && token !== '' && Number.isFinite(Number(token));
 }
 
+/** Human-readable one-liner for a row, used in exported script comments. */
+export function describeMove(move: ProgramMove): string {
+  const [a, b, c] = move.values.map((v) => v.toFixed(1));
+  switch (move.kind) {
+    case 'cartesian':
+      return `x=${a} y=${b} z=${c} mm`;
+    case 'polar':
+      return `r=${a} mm θ=${b}° z=${c} mm`;
+    case 'joints':
+      return `θ1=${a}° θ2=${b}° θ3=${c}°`;
+  }
+}
+
 /** The whole list, disabled rows included, so saving loses nothing. */
 export function programToCsv(moves: ProgramMove[]): string {
   const lines = [
     '# RobotTwin move program',
-    '# kind,a,b,c,dwell_s   —  J: θ1,θ2,θ3 in deg   ·   C: x,y,z in mm',
+    '# kind,a,b,c,dwell_s',
+    '#   C: x,y,z in mm   ·   P: r mm, θ deg, z mm   ·   J: θ1,θ2,θ3 in deg',
     '# a "!" before the kind marks a move that is kept but skipped when running',
   ];
   for (const m of moves) {
-    const tag = `${m.enabled ? '' : '!'}${m.kind === 'joints' ? 'J' : 'C'}`;
+    const tag = `${m.enabled ? '' : '!'}${KIND_TAG[m.kind]}`;
     const [a, b, c] = m.values.map((v) => v.toFixed(1));
     lines.push(`${tag},${a},${b},${c},${m.dwell.toFixed(2)}`);
   }
@@ -163,8 +210,8 @@ export interface ScriptStep {
   /** θ1, θ2, θ3 in degrees — the pose the twin actually executed. */
   anglesDeg: [number, number, number];
   dwell: number;
-  /** x, y, z in mm, when the row was authored as a Cartesian target. */
-  cartesianMm?: [number, number, number];
+  /** How the row was authored, kept as a comment (see describeMove). */
+  note?: string;
 }
 
 /**
@@ -172,13 +219,15 @@ export interface ScriptStep {
  * replayed on the physical arm without being retyped. Verbs match
  * src/hardware/serial_protocol.hpp; SLEEP is a run_script.py host directive.
  *
- * Every step goes out as MOVEJ, including rows authored in Cartesian: the twin
- * has already picked an IK branch and proved that pose reachable, collision
- * free and within the torque budget, so sending joint angles guarantees the
- * hardware reproduces exactly what was simulated instead of re-solving the IK
- * on the ESP32 and possibly landing on the other elbow branch. It also lets
- * run_script.py split each move joint-by-joint for the shared-rail bench,
- * which it cannot do for MOVEL. The Cartesian intent is kept as a comment.
+ * Every step goes out as MOVEJ, including rows authored in Cartesian or polar:
+ * the twin has already picked an IK branch and proved that pose reachable,
+ * collision free and within the torque budget, so sending joint angles
+ * guarantees the hardware reproduces exactly what was simulated instead of
+ * re-solving the IK on the ESP32 and possibly landing on the other elbow
+ * branch. It also lets run_script.py split each move joint-by-joint for the
+ * shared-rail bench, which it cannot do for MOVEL. (There is no polar verb on
+ * the wire at all, so polar rows could not round-trip any other way.) The
+ * authored intent is kept as a comment.
  */
 export function programToRobotScript(steps: ScriptStep[]): string {
   const lines = [
@@ -192,10 +241,7 @@ export function programToRobotScript(steps: ScriptStep[]): string {
     '# ENABLE',
   ];
   for (const step of steps) {
-    if (step.cartesianMm) {
-      const [x, y, z] = step.cartesianMm.map((v) => v.toFixed(1));
-      lines.push(`# target x=${x} y=${y} z=${z} mm`);
-    }
+    if (step.note) lines.push(`# target ${step.note}`);
     const [a, b, c] = step.anglesDeg.map((v) => v.toFixed(2));
     lines.push(`MOVEJ ${a} ${b} ${c}`);
     if (step.dwell > 0) lines.push(`SLEEP ${step.dwell.toFixed(2)}`);

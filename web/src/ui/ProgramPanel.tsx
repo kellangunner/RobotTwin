@@ -9,7 +9,11 @@
 import { useMemo, useRef, useState } from 'react';
 import type { MoveKind, ProgramMove, ScriptStep } from '../core/program';
 import {
+  KIND_AXES,
+  KIND_BADGE,
   MAX_DWELL,
+  MOVE_KINDS,
+  describeMove,
   parseProgramCsv,
   programToCsv,
   programToRobotScript,
@@ -117,8 +121,7 @@ function MoveRow({
   const reorderMove = useTwinStore((s) => s.reorderMove);
 
   const bad = resolution !== undefined && !resolution.ok;
-  const joints = move.kind === 'joints';
-  const unit = joints ? '°' : 'mm';
+  const axes = KIND_AXES[move.kind];
 
   const setValue = (i: number) => (v: number) => {
     const values = [...move.values] as [number, number, number];
@@ -126,11 +129,19 @@ function MoveRow({
     updateMove(move.id, { values });
   };
 
-  // Switching interpretation keeps the numbers: mm and degrees are different
-  // quantities, so re-deriving them would silently move the waypoint. The row
-  // simply revalidates, and an unreachable result is flagged immediately.
-  const toggleKind = () =>
-    updateMove(move.id, { kind: joints ? 'cartesian' : ('joints' as MoveKind) });
+  // Cycling the kind keeps the numbers rather than converting them: the three
+  // frames measure different quantities, and silently rewriting what the user
+  // typed is worse than revalidating and flagging the result.
+  const cycleKind = () =>
+    updateMove(move.id, {
+      kind: MOVE_KINDS[(MOVE_KINDS.indexOf(move.kind) + 1) % MOVE_KINDS.length],
+    });
+
+  const KIND_STYLE: Record<MoveKind, string> = {
+    cartesian: 'border-violet-700 bg-violet-100 text-violet-800',
+    polar: 'border-amber-700 bg-amber-100 text-amber-800',
+    joints: 'border-sky-700 bg-sky-100 text-sky-800',
+  };
 
   return (
     <li
@@ -157,19 +168,13 @@ function MoveRow({
           {index + 1}
         </span>
         <button
-          onClick={toggleKind}
-          title={
-            joints
-              ? 'joint move (θ1, θ2, θ3 in degrees) — click for Cartesian'
-              : 'Cartesian move (x, y, z in mm, solved by IK) — click for joint space'
-          }
+          onClick={cycleKind}
+          title={`${axes.join(', ')} — click to cycle Cartesian → polar → joint`}
           className={`w-7 shrink-0 border px-0.5 py-0.5 text-center font-mono text-[9px] font-semibold ${
-            joints
-              ? 'border-sky-700 bg-sky-100 text-sky-800'
-              : 'border-violet-700 bg-violet-100 text-violet-800'
+            KIND_STYLE[move.kind]
           }`}
         >
-          {joints ? 'θ' : 'XYZ'}
+          {KIND_BADGE[move.kind]}
         </button>
         {[0, 1, 2].map((i) => (
           <NumCell
@@ -177,10 +182,9 @@ function MoveRow({
             value={move.values[i]}
             onCommit={setValue(i)}
             className="w-full min-w-0 flex-1"
-            title={joints ? `θ${i + 1} (deg)` : `${'xyz'[i]} (mm)`}
+            title={axes[i]}
           />
         ))}
-        <span className="shrink-0 text-[9px] text-zinc-400">{unit}</span>
         <NumCell
           value={move.dwell}
           onCommit={(v) => updateMove(move.id, { dwell: v })}
@@ -354,7 +358,7 @@ export function ProgramPanel() {
   const scriptSteps: ScriptStep[] = resolution.steps.map((step) => ({
     anglesDeg: step.q.map(rad2deg) as [number, number, number],
     dwell: step.dwell,
-    cartesianMm: step.move.kind === 'cartesian' ? step.move.values : undefined,
+    note: step.move.kind === 'joints' ? undefined : describeMove(step.move),
   }));
 
   return (
@@ -384,10 +388,25 @@ export function ProgramPanel() {
         </ol>
       )}
 
+      {program.length > 0 && (
+        <p className="mb-2 font-mono text-[9px] leading-relaxed text-zinc-500">
+          <span className="text-violet-700">XYZ</span> x, y, z mm ·{' '}
+          <span className="text-amber-700">RθZ</span> r mm, θ°, z mm ·{' '}
+          <span className="text-sky-700">θ</span> θ1, θ2, θ3 ° · then dwell s
+        </p>
+      )}
+
       <div className="mb-1 flex flex-wrap items-center gap-1">
-        <Chip onClick={() => addMove('cartesian')}>＋ XYZ move</Chip>
-        <Chip onClick={() => addMove('joints')}>＋ θ move</Chip>
-        <span className="text-[10px] text-zinc-500">from current pose</span>
+        <span className="text-[10px] text-zinc-500">Add current pose:</span>
+        <Chip onClick={() => addMove('cartesian')} title="as x, y, z in mm">
+          ＋ XYZ
+        </Chip>
+        <Chip onClick={() => addMove('polar')} title="as r mm, θ deg, z mm about the base axis">
+          ＋ RθZ
+        </Chip>
+        <Chip onClick={() => addMove('joints')} title="as θ1, θ2, θ3 in degrees">
+          ＋ θ
+        </Chip>
       </div>
       <div className="flex flex-wrap items-center gap-1">
         <Chip onClick={() => fileRef.current?.click()}>⭱ Import CSV</Chip>
