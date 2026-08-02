@@ -29,7 +29,8 @@ export function MetricsPanel() {
   const q = useTwinStore((s) => s.q);
   const lastMove = useTwinStore((s) => s.lastMove);
   const motion = useTwinStore((s) => s.motion);
-  const sequence = useTwinStore((s) => s.sequence);
+  const run = useTwinStore((s) => s.run);
+  const running = run !== null && (run.status === 'running' || run.status === 'paused');
 
   const metrics = useMemo(
     () => computeMetrics(config, gearboxes, q, payload),
@@ -81,18 +82,18 @@ export function MetricsPanel() {
       </Panel>
 
       <Panel title="Last move">
-        {sequence && (
+        {running && run && (
           <p className="mb-1 font-mono text-xs text-orange-700">
-            waypoint {Math.min(sequence.index, sequence.targets.length)}/{sequence.targets.length}
-            {motion ? '' : ' — holding'}
+            move {Math.min(run.index + 1, run.steps.length)}/{run.steps.length}
+            {run.status === 'paused' ? ' — paused' : motion ? '' : ' — holding'}
           </p>
         )}
-        {motion && (
+        {motion && run?.status !== 'paused' && (
           <p className="font-mono text-xs text-orange-700">
             moving… {(motion.elapsed).toFixed(1)} / {motion.plan.duration.toFixed(1)} s
           </p>
         )}
-        {!motion && !sequence && lastMove && (
+        {!motion && !running && lastMove && (
           <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
             <dt className="text-zinc-500">Duration</dt>
             <dd className="text-right font-mono tabular-nums text-zinc-900">
@@ -129,7 +130,7 @@ export function MetricsPanel() {
             )}
           </dl>
         )}
-        {!motion && !sequence && !lastMove && (
+        {!motion && !running && !lastMove && (
           <p className="text-xs text-zinc-500">no moves yet</p>
         )}
       </Panel>

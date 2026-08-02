@@ -1,11 +1,9 @@
-// Pose commanding: Cartesian target (IK) or direct joint angles (FK), plus
-// CSV waypoint sequences interpreted per the active tab.
+// Pose commanding: Cartesian target (IK) or direct joint angles (FK). This is
+// how you *aim* the arm; sequences of commanded moves live in ProgramPanel.
 
-import { useRef, useState } from 'react';
 import { JOINT_NAMES } from '../core/config';
 import type { Vec3 } from '../core/kinematics';
 import { deg2rad, m2mm, mm2m, rad2deg } from '../core/units';
-import { parseWaypointCsv } from '../core/api';
 import { config, useTwinStore } from '../state/store';
 import { Chip, Panel, Slider } from './controls';
 
@@ -65,13 +63,14 @@ function JointControls() {
 
 function StatusLine() {
   const status = useTwinStore((s) => s.ikStatus);
-  const sequence = useTwinStore((s) => s.sequence);
+  const run = useTwinStore((s) => s.run);
 
-  if (sequence) {
-    const at = Math.min(sequence.index, sequence.targets.length);
+  if (run && (run.status === 'running' || run.status === 'paused')) {
+    const at = Math.min(run.index + 1, run.steps.length);
     return (
       <div className="mt-2 font-mono text-xs text-orange-700">
-        ▶ waypoint {at}/{sequence.targets.length}…
+        ▶ program move {at}/{run.steps.length}
+        {run.status === 'paused' ? ' — paused' : '…'}
       </div>
     );
   }
@@ -93,50 +92,6 @@ function StatusLine() {
       {status.kind === 'path-collision' && (
         <span className="text-red-600">● move blocked — path collision: {status.issues[0]}</span>
       )}
-    </div>
-  );
-}
-
-function CsvLoader() {
-  const mode = useTwinStore((s) => s.controlMode);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [message, setMessage] = useState<string | null>(null);
-
-  const onFile: React.ChangeEventHandler<HTMLInputElement> = (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    file.text().then((text) => {
-      const s = useTwinStore.getState();
-      const result = parseWaypointCsv(
-        text,
-        s.controlMode === 'target' ? 'cartesian' : 'joints',
-        config,
-        s.branch,
-        s.motion ? s.motion.plan.to : s.q,
-      );
-      if (result.targets.length === 0) {
-        setMessage(`no valid waypoints${result.firstIssue ? ` — ${result.firstIssue}` : ''}`);
-        return;
-      }
-      setMessage(
-        `${result.targets.length} waypoints loaded` +
-          (result.skipped > 0 ? ` · ${result.skipped} skipped (${result.firstIssue})` : ''),
-      );
-      s.startSequence(result.targets);
-    });
-  };
-
-  return (
-    <div className="mt-2 border-t border-zinc-300 pt-2">
-      <div className="flex items-center gap-1">
-        <Chip onClick={() => fileRef.current?.click()}>⭱ Load CSV</Chip>
-        <span className="text-[10px] text-zinc-500">
-          rows: {mode === 'target' ? 'x, y, z (mm)' : 'θ1, θ2, θ3 (deg)'}
-        </span>
-      </div>
-      <input ref={fileRef} type="file" accept=".csv,text/csv,text/plain" className="hidden" onChange={onFile} />
-      {message && <p className="mt-1 text-[10px] text-zinc-500">{message}</p>}
     </div>
   );
 }
@@ -163,7 +118,6 @@ export function PosePanel() {
       </div>
       {mode === 'target' ? <TargetControls /> : <JointControls />}
       <StatusLine />
-      <CsvLoader />
     </Panel>
   );
 }

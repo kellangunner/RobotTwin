@@ -58,20 +58,28 @@ export function Slider({
 
 export function Chip({
   active,
+  disabled,
+  title,
   onClick,
   children,
 }: {
   active?: boolean;
+  disabled?: boolean;
+  title?: string;
   onClick: () => void;
   children: ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
+      title={title}
       className={`border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
-        active
-          ? 'border-orange-700 bg-orange-600 text-white'
-          : 'border-zinc-400 bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
+        disabled
+          ? 'cursor-not-allowed border-zinc-300 bg-zinc-100 text-zinc-400'
+          : active
+            ? 'border-orange-700 bg-orange-600 text-white'
+            : 'border-zinc-400 bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
       }`}
     >
       {children}

@@ -83,11 +83,40 @@ full radius — far too conservative), and vs a shoulder-joint sphere for deep e
 forearm capsule is trimmed near its own elbow, where adjacent links legitimately meet). Every
 command path is gated: IK drops colliding branches, joint-slider commands are refused, planned
 trajectories are sampled densely pose-by-pose before executing (endpoints being safe does not
-make the sweep safe), and CSV waypoints are validated row-by-row with per-line reasons.
+make the sweep safe), and program rows are validated individually with a per-row reason.
 
-**Waypoint sequences** — a CSV of rows interpreted per the active tab (`x,y,z` mm via IK with
-branch continuity, or `θ1,θ2,θ3` deg) runs as a chain of quintic legs with a 0.8 s dwell at
-each waypoint; the final report aggregates the worst torque utilization across all legs.
+**The move program** (`core/program.ts`, `core/programResolve.ts`, `ui/ProgramPanel.tsx`) — the
+sliders *pose* the arm; the program is how you *command* it, and it is the twin's model of how
+the physical robot actually works: a queue of moves, each planned, executed to completion, then
+held for a dwell before the next starts. Nothing follows the cursor.
+
+Each row is a Cartesian target (`x, y, z` mm, solved by IK with branch continuity chained from
+the previous row) or a joint target (`θ1, θ2, θ3` deg), plus a dwell and an enable flag. Rows
+resolve as you type — reach, joint limits and collision are reported inline per row — so an
+unreachable waypoint is something you see and fix, not something silently dropped at load time.
+
+`program.ts` is deliberately kinematics-free (rows, units, text round-trips) so it unit tests in
+isolation; `programResolve.ts` is the half that goes through the C++ core.
+
+Running resolves every enabled row up front and commits that snapshot: editing mid-run affects
+the *next* run, matching the firmware's contract that a queued move is fixed once accepted. The
+runner supports run / pause / resume / single-step / loop. Pause shifts the motion clock rather
+than replanning, so a paused leg resumes on the exact profile it was already following. A
+swept-path collision that only appears between two individually-safe waypoints stops the run
+where it is and names the offending move. The final report aggregates the worst torque
+utilization across every leg.
+
+**Program I/O** — CSV rows are `[kind,] a, b, c [, dwell]`; the optional leading `J`/`C` tag lets
+a mixed program round-trip, and `!` before it marks a disabled row. Import *appends to the
+editor* rather than auto-running, so an imported file can be inspected and corrected first.
+
+Export as CSV (everything, disabled rows included) or as a **robot script** for
+`python/run_script.py` — only the enabled rows that resolved, emitted as `MOVEJ` with the joint
+angles the twin validated. Cartesian rows go out as joint angles too, with the target kept as a
+comment: the twin has already chosen an IK branch and proved that pose safe, so sending angles
+guarantees the hardware reproduces what was simulated instead of re-solving IK on the ESP32 and
+possibly landing on the other elbow branch. It also lets the runner split each move
+joint-by-joint for the shared-rail bench, which it cannot do for `MOVEL`.
 
 ## Assumptions & limitations
 

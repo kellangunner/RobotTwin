@@ -22,9 +22,12 @@ import type { GearboxParams, JointName, RobotConfig } from '../core/config';
 import { parseRobotConfig } from '../core/config';
 import type { DriveSelection } from '../core/gearboxModel';
 import type { JointAngles, Vec3, IkBranch } from '../core/kinematics';
+import type { MoveKind, ProgramMove } from '../core/program';
+import { DEFAULT_DWELL, MAX_DWELL, makeMove } from '../core/program';
+import { resolveProgram } from '../core/programResolve';
 import { retimeForTorque } from '../core/retime';
 import type { TrajectoryPlan } from '../core/trajectory';
-import { deg2rad } from '../core/units';
+import { clamp, deg2rad, m2mm, rad2deg } from '../core/units';
 
 export const config: RobotConfig = parseRobotConfig(robotYaml);
 
@@ -58,12 +61,34 @@ interface Motion {
   elapsed: number;
 }
 
-export interface SequenceState {
-  targets: JointAngles[];
-  /** Next leg to start (leg index-1 is currently executing or just finished). */
+/** One leg of a run: a program row already resolved to a joint target. */
+export interface RunStep {
+  moveId: string;
+  q: JointAngles;
+  dwell: number;
+}
+
+export type RunStatus = 'running' | 'paused' | 'done' | 'error';
+
+/**
+ * A program execution. Steps are resolved once, at start: editing the program
+ * mid-run changes the *next* run, never the one in flight — the same contract
+ * the firmware gives, where a queued move is committed when it is accepted.
+ */
+export interface ProgramRun {
+  steps: RunStep[];
+  /** Step in flight, or the next one to start while dwelling. */
   index: number;
-  /** Dwell deadline (ms) between legs; null while a leg is in flight. */
+  status: RunStatus;
+  /** Pause as soon as the current leg lands (single-step). */
+  stepping: boolean;
+  /** Dwell deadline (ms, performance.now clock); null when not dwelling. */
   holdUntil: number | null;
+  /** Dwell left over when paused mid-hold, restored on resume. */
+  holdRemaining: number | null;
+  /** Completed passes, for looping programs. */
+  cycle: number;
+  error: string | null;
   // aggregated across legs for the final move report
   peakUtilization: number;
   peakJoint: JointName;
@@ -71,9 +96,6 @@ export interface SequenceState {
   totalDuration: number;
   maxStretch: number;
 }
-
-/** Dwell at each waypoint before moving on. */
-export const WAYPOINT_HOLD_S = 0.8;
 
 interface TwinState {
   /** The independent variables: drive type + reduction ratio per joint. */
@@ -87,7 +109,12 @@ interface TwinState {
   q: JointAngles;    // animated pose
   ikStatus: IkStatus;
   motion: Motion | null;
-  sequence: SequenceState | null;
+  /** The editable list of commanded moves. */
+  program: ProgramMove[];
+  /** The run in flight (or the last one's outcome); null when never run. */
+  run: ProgramRun | null;
+  /** Restart the program from the top instead of stopping at the last move. */
+  loop: boolean;
   lastMove: MoveReport | null;
   trace: Vec3[];
   showWorkspace: boolean;
@@ -100,9 +127,25 @@ interface TwinState {
   setJointTarget: (index: number, angle: number) => void;
   goHome: () => void;
   toggleWorkspace: () => void;
-  /** Visit each joint-space target in order, dwelling between legs. */
-  startSequence: (targets: JointAngles[]) => void;
   clearTrace: () => void;
+
+  // ------------------------------------------------------------ the program
+  /** Append the arm's currently commanded pose as a move. */
+  addMove: (kind: MoveKind) => void;
+  updateMove: (id: string, patch: Partial<Omit<ProgramMove, 'id'>>) => void;
+  removeMove: (id: string) => void;
+  /** Shift a move one place earlier (-1) or later (+1) in the list. */
+  reorderMove: (id: string, delta: -1 | 1) => void;
+  setProgram: (moves: ProgramMove[]) => void;
+  clearProgram: () => void;
+
+  runProgram: () => void;
+  /** Run exactly one move, then hold. */
+  stepProgram: () => void;
+  pauseRun: () => void;
+  resumeRun: () => void;
+  stopRun: () => void;
+  setLoop: (loop: boolean) => void;
 }
 
 const TRACE_CAP = 800;
@@ -188,57 +231,90 @@ export const useTwinStore = create<TwinState>((set, get) => {
     clock = setInterval(tick, 1000 / 30);
   };
 
-  const finalReport = (seq: SequenceState): MoveReport => ({
-    duration: seq.totalDuration,
-    peakUtilization: seq.peakUtilization,
-    peakJoint: seq.peakJoint,
-    skippedSteps: seq.peakUtilization > 1,
-    infeasible: seq.infeasible,
-    stretch: seq.maxStretch,
+  const finalReport = (run: ProgramRun): MoveReport => ({
+    duration: run.totalDuration,
+    peakUtilization: run.peakUtilization,
+    peakJoint: run.peakJoint,
+    skippedSteps: run.peakUtilization > 1,
+    infeasible: run.infeasible,
+    stretch: run.maxStretch,
   });
 
-  // Ticks only animate and advance the waypoint sequence; all physics and
-  // collision conclusions for each leg are drawn at plan time.
+  /** Plan and launch the leg at `run.index`, wrapping first if looping. */
+  const beginLeg = (now: number) => {
+    const s = get();
+    const run = s.run;
+    if (!run) return;
+
+    let { index, cycle } = run;
+    if (index >= run.steps.length) {
+      if (!s.loop || run.steps.length === 0) {
+        stopClock();
+        set({ run: { ...run, status: 'done', holdUntil: null, holdRemaining: null } });
+        return;
+      }
+      index = 0;
+      cycle += 1;
+    }
+
+    const step = run.steps[index];
+    const { plan, report } = planLeg(s.q, step.q, s);
+    const path = checkPath(plan, config.links, config.collision);
+    if (path.colliding) {
+      // Endpoints were validated when the run started, so this is a swept-path
+      // conflict; stop where we are rather than driving through it.
+      stopClock();
+      set({
+        motion: null,
+        ikStatus: { kind: 'path-collision', issues: path.issues },
+        lastMove: finalReport(run),
+        run: {
+          ...run,
+          index,
+          cycle,
+          status: 'error',
+          holdUntil: null,
+          holdRemaining: null,
+          error: `move ${index + 1}: path collision — ${path.issues[0]}`,
+        },
+      });
+      return;
+    }
+
+    set({
+      motion: { plan, report, startedAt: now, elapsed: 0 },
+      target: forwardKinematics(step.q, config.links).tcp,
+      ikStatus: { kind: 'ok', nearSingularity: false },
+      run: {
+        ...run,
+        index,
+        cycle,
+        holdUntil: null,
+        holdRemaining: null,
+        peakUtilization: Math.max(run.peakUtilization, report.peakUtilization),
+        peakJoint:
+          report.peakUtilization > run.peakUtilization ? report.peakJoint : run.peakJoint,
+        infeasible: run.infeasible || report.infeasible,
+        totalDuration: run.totalDuration + report.duration,
+        maxStretch: Math.max(run.maxStretch, report.stretch),
+      },
+    });
+  };
+
+  // Ticks only animate and advance the program; all physics and collision
+  // conclusions for each leg are drawn at plan time.
   const tick = () => {
     const s = get();
     const now = performance.now();
 
     if (!s.motion) {
-      const seq = s.sequence;
-      if (!seq) {
+      const run = s.run;
+      if (!run || run.status !== 'running') {
         stopClock();
         return;
       }
-      if (seq.holdUntil !== null && now < seq.holdUntil) return; // dwelling
-      // start the next leg
-      const to = seq.targets[seq.index];
-      const { plan, report } = planLeg(s.q, to, s);
-      const path = checkPath(plan, config.links, config.collision);
-      if (path.colliding) {
-        stopClock();
-        set({
-          sequence: null,
-          ikStatus: { kind: 'path-collision', issues: path.issues },
-          lastMove: finalReport(seq),
-        });
-        return;
-      }
-      set({
-        motion: { plan, report, startedAt: now, elapsed: 0 },
-        target: forwardKinematics(to, config.links).tcp,
-        ikStatus: { kind: 'ok', nearSingularity: false },
-        sequence: {
-          ...seq,
-          index: seq.index + 1,
-          holdUntil: null,
-          peakUtilization: Math.max(seq.peakUtilization, report.peakUtilization),
-          peakJoint:
-            report.peakUtilization > seq.peakUtilization ? report.peakJoint : seq.peakJoint,
-          infeasible: seq.infeasible || report.infeasible,
-          totalDuration: seq.totalDuration + report.duration,
-          maxStretch: Math.max(seq.maxStretch, report.stretch),
-        },
-      });
+      if (run.holdUntil !== null && now < run.holdUntil) return; // dwelling
+      beginLeg(now);
       return;
     }
 
@@ -256,32 +332,94 @@ export const useTwinStore = create<TwinState>((set, get) => {
     }
 
     // leg finished
-    const seq = s.sequence;
-    if (seq && seq.index < seq.targets.length) {
-      set({
-        q: plan.to,
-        motion: null,
-        trace,
-        sequence: {
-          ...seq,
-          holdUntil: now + WAYPOINT_HOLD_S * 1000,
-          totalDuration: seq.totalDuration + WAYPOINT_HOLD_S,
-        },
-      });
-    } else {
+    const run = s.run;
+    if (!run) {
+      stopClock();
+      set({ q: plan.to, motion: null, trace, lastMove: report });
+      return;
+    }
+
+    const dwellMs = Math.max(0, run.steps[run.index]?.dwell ?? 0) * 1000;
+    const nextIndex = run.index + 1;
+
+    if (nextIndex >= run.steps.length && !s.loop) {
       stopClock();
       set({
         q: plan.to,
         motion: null,
         trace,
-        sequence: null,
-        lastMove: seq ? finalReport(seq) : report,
+        run: { ...run, index: nextIndex, status: 'done', holdUntil: null, holdRemaining: null },
+        lastMove: finalReport(run),
       });
+      return;
     }
+
+    if (run.stepping) {
+      stopClock();
+      set({
+        q: plan.to,
+        motion: null,
+        trace,
+        run: {
+          ...run,
+          index: nextIndex,
+          status: 'paused',
+          stepping: false,
+          holdUntil: null,
+          holdRemaining: dwellMs,
+        },
+      });
+      return;
+    }
+
+    set({
+      q: plan.to,
+      motion: null,
+      trace,
+      run: {
+        ...run,
+        index: nextIndex,
+        holdUntil: now + dwellMs,
+        holdRemaining: null,
+        totalDuration: run.totalDuration + dwellMs / 1000,
+      },
+    });
+  };
+
+  /** The pose the arm is committed to reach — what a new move starts from. */
+  const commandedPose = (s: TwinState): JointAngles => (s.motion ? s.motion.plan.to : s.q);
+
+  /** Resolve the program and launch it from the top. */
+  const launch = (stepping: boolean) => {
+    const s = get();
+    const { steps } = resolveProgram(s.program, config, s.branch, s.q);
+    if (steps.length === 0) return;
+
+    startClock();
+    set({
+      motion: null,
+      lastMove: null,
+      trace: [],
+      run: {
+        steps: steps.map((st) => ({ moveId: st.move.id, q: st.q, dwell: st.dwell })),
+        index: 0,
+        status: 'running',
+        stepping,
+        holdUntil: null,
+        holdRemaining: null,
+        cycle: 0,
+        error: null,
+        peakUtilization: 0,
+        peakJoint: 'base',
+        infeasible: false,
+        totalDuration: 0,
+        maxStretch: 1,
+      },
+    });
   };
 
   /**
-   * Plan and begin a single move to `to`, cancelling any running sequence.
+   * Plan and begin a single move to `to`, cancelling any program run.
    * If the path would collide, nothing moves and the status says why.
    */
   const startMove = (to: JointAngles): Partial<TwinState> => {
@@ -292,14 +430,14 @@ export const useTwinStore = create<TwinState>((set, get) => {
       return {
         ikStatus: { kind: 'path-collision', issues: path.issues },
         motion: null,
-        sequence: null,
+        run: null,
       };
     }
     startClock();
     return {
       motion: { plan, report, startedAt: performance.now(), elapsed: 0 },
       lastMove: null,
-      sequence: null,
+      run: null,
     };
   };
 
@@ -313,7 +451,9 @@ export const useTwinStore = create<TwinState>((set, get) => {
     q: HOME_POSE,
     ikStatus: { kind: 'ok' as const, nearSingularity: false },
     motion: null as Motion | null,
-    sequence: null as SequenceState | null,
+    program: [] as ProgramMove[],
+    run: null as ProgramRun | null,
+    loop: false,
     lastMove: null as MoveReport | null,
     trace: [] as Vec3[],
     showWorkspace: true,
@@ -360,12 +500,12 @@ export const useTwinStore = create<TwinState>((set, get) => {
 
     setJointTarget: (index, angle) => {
       const s = get();
-      const to = [...(s.motion ? s.motion.plan.to : s.q)] as JointAngles;
+      const to = [...commandedPose(s)] as JointAngles;
       to[index] = angle;
       const pose = checkPose(to, config.links, config.collision);
       if (pose.colliding) {
         // block the command; the slider snaps back to the last safe target
-        set({ ikStatus: { kind: 'collision', issues: pose.issues }, sequence: null });
+        set({ ikStatus: { kind: 'collision', issues: pose.issues }, run: null });
         return;
       }
       const tcp = forwardKinematics(to, config.links).tcp;
@@ -384,34 +524,120 @@ export const useTwinStore = create<TwinState>((set, get) => {
 
     toggleWorkspace: () => set((s) => ({ showWorkspace: !s.showWorkspace })),
 
-    startSequence: (targets) => {
-      if (targets.length === 0) return;
+    clearTrace: () => set({ trace: [] }),
+
+    // ------------------------------------------------------------ the program
+
+    addMove: (kind) =>
+      set((s) => {
+        const pose = commandedPose(s);
+        const values: [number, number, number] =
+          kind === 'joints'
+            ? (pose.map(rad2deg) as [number, number, number])
+            : (forwardKinematics(pose, config.links).tcp.map(m2mm) as [number, number, number]);
+        return { program: [...s.program, makeMove(kind, values, DEFAULT_DWELL)] };
+      }),
+
+    updateMove: (id, patch) =>
+      set((s) => ({
+        program: s.program.map((m) =>
+          m.id === id
+            ? {
+                ...m,
+                ...patch,
+                dwell: patch.dwell === undefined ? m.dwell : clamp(patch.dwell, 0, MAX_DWELL),
+              }
+            : m,
+        ),
+      })),
+
+    removeMove: (id) => set((s) => ({ program: s.program.filter((m) => m.id !== id) })),
+
+    reorderMove: (id, delta) =>
+      set((s) => {
+        const i = s.program.findIndex((m) => m.id === id);
+        const j = i + delta;
+        if (i < 0 || j < 0 || j >= s.program.length) return {};
+        const program = [...s.program];
+        [program[i], program[j]] = [program[j], program[i]];
+        return { program };
+      }),
+
+    setProgram: (moves) => set({ program: moves }),
+
+    clearProgram: () => set({ program: [], run: null }),
+
+    runProgram: () => launch(false),
+
+    stepProgram: () => {
       const s = get();
-      const { plan, report } = planLeg(s.q, targets[0], s);
-      const path = checkPath(plan, config.links, config.collision);
-      if (path.colliding) {
-        set({ ikStatus: { kind: 'path-collision', issues: path.issues }, sequence: null });
+      // Paused mid-program: advance exactly one more leg from where we are.
+      if (s.run && (s.run.status === 'paused' || s.run.status === 'running')) {
+        const now = performance.now();
+        const run = s.run;
+        startClock();
+        set({
+          motion: s.motion ? { ...s.motion, startedAt: now - s.motion.elapsed * 1000 } : null,
+          run: {
+            ...run,
+            status: 'running',
+            stepping: true,
+            holdUntil: run.holdRemaining !== null ? now + run.holdRemaining : run.holdUntil,
+            holdRemaining: null,
+          },
+        });
         return;
       }
-      startClock();
+      launch(true);
+    },
+
+    pauseRun: () => {
+      const s = get();
+      const run = s.run;
+      if (!run || run.status !== 'running') return;
+      stopClock();
+      const now = performance.now();
       set({
-        motion: { plan, report, startedAt: performance.now(), elapsed: 0 },
-        lastMove: null,
-        target: forwardKinematics(targets[0], config.links).tcp,
-        ikStatus: { kind: 'ok', nearSingularity: false },
-        sequence: {
-          targets,
-          index: 1,
+        run: {
+          ...run,
+          status: 'paused',
           holdUntil: null,
-          peakUtilization: report.peakUtilization,
-          peakJoint: report.peakJoint,
-          infeasible: report.infeasible,
-          totalDuration: report.duration,
-          maxStretch: report.stretch,
+          holdRemaining:
+            run.holdUntil !== null ? Math.max(0, run.holdUntil - now) : run.holdRemaining,
         },
       });
     },
 
-    clearTrace: () => set({ trace: [] }),
+    resumeRun: () => {
+      const s = get();
+      const run = s.run;
+      if (!run || run.status !== 'paused') return;
+      const now = performance.now();
+      startClock();
+      set({
+        // Shift the clock instead of replanning, so the paused leg resumes on
+        // the exact profile it was already following.
+        motion: s.motion ? { ...s.motion, startedAt: now - s.motion.elapsed * 1000 } : null,
+        run: {
+          ...run,
+          status: 'running',
+          stepping: false,
+          holdUntil: run.holdRemaining !== null ? now + run.holdRemaining : null,
+          holdRemaining: null,
+        },
+      });
+    },
+
+    stopRun: () => {
+      const s = get();
+      stopClock();
+      set({
+        motion: null,
+        run: null,
+        lastMove: s.run ? finalReport(s.run) : s.lastMove,
+      });
+    },
+
+    setLoop: (loop) => set({ loop }),
   };
 });

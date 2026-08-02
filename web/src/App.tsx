@@ -3,6 +3,7 @@ import { Scene } from './three/Scene';
 import { GearboxPanel } from './ui/GearboxPanel';
 import { MetricsPanel } from './ui/MetricsPanel';
 import { PosePanel } from './ui/PosePanel';
+import { ProgramPanel } from './ui/ProgramPanel';
 import { config } from './state/store';
 import { wasmReady } from './core/api';
 
@@ -53,9 +54,10 @@ function AppContent() {
         <main className="relative min-w-0 flex-1 border-r border-zinc-400">
           <Scene />
         </main>
-        <aside className="w-72 shrink-0 overflow-y-auto p-3">
+        <aside className="w-96 shrink-0 overflow-y-auto p-3">
           <div className="flex flex-col gap-3">
             <PosePanel />
+            <ProgramPanel />
             <MetricsPanel />
           </div>
         </aside>
