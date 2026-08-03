@@ -1,0 +1,10 @@
+{
+    "autodeskProduct": "Fusion360",
+    "type": "script",
+    "author": "RobotTwin",
+    "description": {
+        "": "Generates the RobotTwin parallel-jaw lead-screw gripper and exports f3d/step/stl."
+    },
+    "supportedOS": "windows|mac",
+    "editEnabled": true
+}

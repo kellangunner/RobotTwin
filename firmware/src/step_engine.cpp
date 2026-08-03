@@ -5,6 +5,7 @@
 #include "driver/gpio.h"
 #include "driver/gptimer.h"
 #include "esp_attr.h"
+#include "esp_rom_sys.h"
 #include "soc/gpio_struct.h"
 
 namespace fw {
@@ -97,9 +98,17 @@ void IRAM_ATTR StepEngine::isrTick() {
     ch.pos += forward ? 1 : -1;
   }
   if (stepMask != 0) {
-    // Rising edge steps the TMC2209. The loop bookkeeping between set and
-    // clear comfortably covers the 100 ns minimum high time at 240 MHz.
+    // Rising edge steps the TMC2209, which needs STEP high for >= 100 ns.
+    // These two register writes used to be back-to-back: the old comment
+    // claimed "loop bookkeeping" covered the minimum, but no bookkeeping sits
+    // between them, so the pulse was only ~10-25 ns at 240 MHz. That is below
+    // spec and, worse, MARGINAL -- whether a driver saw the edge depended on
+    // the capacitance of its particular wire run, so long jumpers (the base's
+    // STEP crosses the whole breadboard) silently dropped steps while short
+    // ones worked. Hold the line high explicitly instead. 2 us is 20x the
+    // minimum and still only ~8% of the 25 us tick period at 40 kHz.
     GPIO.out_w1ts = stepMask;
+    esp_rom_delay_us(2);
     GPIO.out_w1tc = stepMask;
   }
 }

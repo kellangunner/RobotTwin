@@ -24,14 +24,27 @@ masses:
   upper_arm_g: 160
   forearm_g: 120
   elbow_motor_g: 350       # NEMA 17 mounted at the elbow joint
-  gripper_g: 90            # at TCP
+  gripper_g: 60            # at TCP (engineering/gripper v2 SG-90: ~56 g estimate)
   payload_default_g: 100
   payload_max_g: 2000
 
 # All three joints use the same motor (NEMA 17, 42x48)
 motor:
-  holding_torque_nm: 0.45
-  max_speed_rpm: 600         # usable ceiling before torque collapse
+  # 0.45 is the datasheet figure at FULL rated current (~1.5-2 A). The bench rig
+  # runs tmc_uart.irun: 16 (~0.9-1.0 A), so the real number is roughly half —
+  # and the governor can only respect the torque it is told about. With 0.45 it
+  # timed moves the motors could not follow (stall) and approved holds the
+  # shoulder could not sustain (gravity backdrive). Restore 0.45 only when the
+  # motor supply moves off the breadboard and irun goes to full current.
+  # Track this to irun: ~0.25 at irun 16, ~0.19 at irun 12.
+  holding_torque_nm: 0.25
+  # Measured on the bench rig, not a datasheet figure: a 10 deg elbow move
+  # (~100-135 rpm peak) executes cleanly, while a 90 deg move timed at
+  # ~384 rpm average stalls partway and drops the remaining steps. The real
+  # collapse point sits between the two, so cap just above what is proven.
+  # Raise incrementally -- and only once the motor supply is off the
+  # breadboard and running full current.
+  max_speed_rpm: 150         # usable ceiling before torque collapse
   rotor_inertia_g_cm2: 57
   step_angle_deg: 1.8
   microstepping: 16
@@ -45,11 +58,22 @@ gearboxes:
     type: direct     # base is direct-driven by its NEMA 17 (no gravity torque on the yaw axis)
     ratio: 1
   shoulder:
+    # Physical hardware is the 20:1 cycloidal cartridge (higher reduction on the
+    # higher-load joint). Config said 15 -- with that, firmware emitted steps for
+    # 15:1 against 20:1 hardware, so every shoulder move landed at 3/4 of the
+    # commanded angle, and the torque model under-read the joint's real capacity.
+    type: cycloidal
+    ratio: 20
+  elbow:
+    # Was planetary 10:1 -- that never matched the build. The physical elbow is
+    # the 15:1 cycloidal cartridge (16 ring pins = Zc + 1), per
+    # engineering/gearboxes/README.md, which specifies cycloidal reducers for
+    # both pitch joints (shoulder 20:1, elbow 15:1). With ratio 10 the firmware
+    # emitted steps for 10:1 against 15:1 hardware, so every elbow move landed at
+    # 2/3 of the commanded angle -- and the torque model used planetary
+    # efficiency and the 3.5 Nm printed-gear cap instead of cycloidal's.
     type: cycloidal
     ratio: 15
-  elbow:
-    type: planetary
-    ratio: 5
 
 # Characteristic models for each printable drive type. A planetary stage tops
 # out around 6:1, so higher ratios stack stages and compound their losses and
@@ -86,7 +110,7 @@ collision:
   shoulder_radius_mm: 42      # shoulder joint + motor block envelope
   upper_arm_radius_mm: 26
   forearm_radius_mm: 22
-  gripper_extent_mm: 32       # gripper reach beyond the TCP along the forearm
+  gripper_extent_mm: 75       # fingertips 71 mm beyond the TCP (gripper v2) + margin
   elbow_trim: 0.2             # forearm fraction ignored next to its own elbow joint
 
 # Standard mechanical components the design is built around

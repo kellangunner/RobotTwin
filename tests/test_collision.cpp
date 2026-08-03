@@ -65,7 +65,9 @@ RT_TEST(detects_deep_elbow_fold_against_shoulder) {
   const CollisionCheck deep = checkPose(pose(0, 90, -150), cfg.links, cfg.collision);
   CHECK(deep.colliding);
   CHECK(hasIssue(deep, CollisionIssue::ForearmShoulder));
-  CHECK(!checkPose(pose(0, 90, -140), cfg.links, cfg.collision).colliding);
+  // -130 is the safe bracket: the shoulder housing is met from -148 (with
+  // the 75 mm gripper the tip no longer reaches the ground at q2 = 90)
+  CHECK(!checkPose(pose(0, 90, -130), cfg.links, cfg.collision).colliding);
 }
 
 RT_TEST(collision_is_base_yaw_invariant) {

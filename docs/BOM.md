@@ -108,9 +108,20 @@ Gripper shopping list (details in its README):
 |---|---|---|
 | SG-90 9 g micro servo | 1 | drives the lantern pinion directly; clones fine |
 | TPU filament (pads) | — | printed jaw faces |
+| Arduino Uno | 1 | the gripper node — drives the servo, runs `arduino/gripper_node/` |
+| 10 kΩ potentiometer | 1 | manual opening knob on A0; any linear taper |
+| 470–1000 µF electrolytic | 1 | across servo V+/GND **at the connector** — covers the stall inrush |
+| 0.1 µF ceramic | 1 | in parallel with the above |
+| 1 kΩ resistor | 1 | in series on the ESP32 GPIO 13 → Uno D2 relay line |
 
 No lead screw, nut, thrust bearings, homing switch, or extra stepper
-driver — the servo replaces all of it. Firmware note: the gripper axis is
-one 50 Hz PWM channel (free GPIO 13 suggested) plus a 5 V rail good for
-~650 mA stall transients — a `firmware.yaml` + firmware extension, not
-just wiring; the old step/dir 13/14 + limit 27 reservation is obsolete.
+driver — the servo replaces all of it.
+
+**The servo does not run on the ESP32.** It hangs off the Uno above, powered
+from a bench supply at **5.0 V with a 1 A limit**, deliberately independent of
+both the motor supply and the logic rail — a stalled SG-90 pulls ~650 mA, which
+is exactly the transient that browns out the board generating step pulses. Only
+grounds are shared. GPIO 13 still belongs to the gripper, but it now carries
+serial commands to the Uno rather than PWM to the servo. See
+[wiring-and-bringup.md](wiring-and-bringup.md) "Gripper node"; the old step/dir
+13/14 + limit 27 reservation is obsolete.

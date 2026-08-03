@@ -3,6 +3,7 @@ idf_component_register(
     main.cpp
     embedded_configs.cpp
     step_engine.cpp
+    gripper_link.cpp
     motion_controller.cpp
     serial_console.cpp
     tmc2209.cpp

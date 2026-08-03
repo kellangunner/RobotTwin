@@ -47,8 +47,8 @@ Every structural part clears the build volume with ≥ 10 mm margin; no part nee
 
 **Torque feasibility (worst case, arm straight and horizontal, 100 g payload):**
 
-- Shoulder gravity torque ≈ **1.2 N·m** (link masses + elbow-mounted NEMA 17 + gripper + payload)
-- Elbow gravity torque ≈ **0.30 N·m**
+- Shoulder gravity torque ≈ **1.09 N·m** (link masses + elbow-mounted NEMA 17 + 60 g gripper + payload)
+- Elbow gravity torque ≈ **0.26 N·m**
 - A NEMA 17 (0.45 N·m holding) needs roughly a **4:1 ratio at ~80 % efficiency just to hold** the shoulder
   at full extension — which is exactly the regime where the gearbox trade study is interesting.
   Ratios from 1:1 (fails) to ~30:1 (slow but strong) all produce meaningfully different behavior.

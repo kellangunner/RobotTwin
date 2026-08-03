@@ -1,5 +1,6 @@
 #include "hardware_config.hpp"
 
+#include <cmath>
 #include <stdexcept>
 
 #include "../config/yaml_lite.hpp"
@@ -38,6 +39,53 @@ LimitSwitchConfig parseLimit(const yaml::Node& n) {
   lim.seekSlow = deg2rad(n.at("seek_slow_deg_s").asDouble());
   lim.backoff = deg2rad(n.at("backoff_deg").asDouble());
   return lim;
+}
+
+GripperConfig parseGripper(const yaml::Node& n) {
+  GripperConfig g{};
+  // pin and knob_pin belong to the Arduino that drives the servo, so this
+  // parser only sanity-checks them; relay_pin is the one the ESP32 actually
+  // configures, and GPIO34-39 are input-only so they cannot carry a UART TX.
+  g.pin = asInt(n.at("pin"));
+  if (g.pin < 0) throw std::runtime_error("gripper.pin must be a valid Arduino pin");
+  g.relayPin = asInt(n.at("relay_pin"));
+  if (g.relayPin < 0 || g.relayPin > 33)
+    throw std::runtime_error("gripper.relay_pin must be an output-capable GPIO 0..33");
+  g.relayRxPin = asInt(n.at("relay_rx_pin"));
+  if (g.relayRxPin < 2)
+    throw std::runtime_error("gripper.relay_rx_pin must be >= 2 (D0/D1 are the Uno's USB UART)");
+  g.relayBaud = asInt(n.at("relay_baud"));
+  if (g.relayBaud < 1200 || g.relayBaud > 115200)
+    throw std::runtime_error("gripper.relay_baud must be 1200..115200");
+  g.knobPin = asInt(n.at("knob_pin"));
+  if (g.knobPin < 0) throw std::runtime_error("gripper.knob_pin must be a valid Arduino pin");
+  g.pwmHz = n.at("pwm_hz").asDouble();
+  if (g.pwmHz < 20 || g.pwmHz > 400)
+    throw std::runtime_error("gripper.pwm_hz must be 20..400 (hobby servos want 50)");
+
+  g.closedPulse = us2s(n.at("closed_pulse_us").asDouble());
+  g.openPulse = us2s(n.at("open_pulse_us").asDouble());
+  // Outside this window a hobby servo either ignores the frame or slams into
+  // its internal stop and stalls; a span this small is a calibration typo.
+  for (const double pulse : {g.closedPulse, g.openPulse}) {
+    if (pulse < us2s(400) || pulse > us2s(2600))
+      throw std::runtime_error("gripper pulse widths must be 400..2600 us");
+    if (pulse >= 1.0 / g.pwmHz)
+      throw std::runtime_error("gripper pulse width exceeds the PWM period");
+  }
+  if (std::abs(g.openPulse - g.closedPulse) < us2s(50))
+    throw std::runtime_error("gripper open/closed pulses must differ by >= 50 us");
+
+  g.maxOpening = mm2m(n.at("max_opening_mm").asDouble());
+  if (g.maxOpening <= 0) throw std::runtime_error("gripper.max_opening_mm must be > 0");
+  g.speed = mm2m(n.at("speed_mm_s").asDouble());
+  if (g.speed <= 0) throw std::runtime_error("gripper.speed_mm_s must be > 0");
+  g.bootOpening = mm2m(n.at("boot_opening_mm").asDouble());
+  if (g.bootOpening < 0 || g.bootOpening > g.maxOpening)
+    throw std::runtime_error("gripper.boot_opening_mm must be within 0..max_opening_mm");
+  g.releaseAfter = n.at("release_after_s").asDouble();
+  if (g.releaseAfter < 0) throw std::runtime_error("gripper.release_after_s must be >= 0");
+  return g;
 }
 
 JointPinsConfig parseJointPins(const yaml::Node& n) {
@@ -88,6 +136,8 @@ HardwareConfig parseHardwareConfig(const std::string& yamlText) {
   cfg.tmcIhold = asInt(tmc.at("ihold"));
   if (cfg.tmcIrun < 0 || cfg.tmcIrun > 31 || cfg.tmcIhold < 0 || cfg.tmcIhold > 31)
     throw std::runtime_error("tmc_uart currents must be 0..31");
+
+  cfg.gripper = parseGripper(root.at("gripper"));
 
   const auto order = root.at("homing_order");
   {

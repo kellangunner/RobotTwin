@@ -1,0 +1,31 @@
+# Consumed by engineering/gripper/gripper_geometry.py (the parametric layer)
+# and engineering/gripper/gripper.py (the Fusion generator). Both parse this
+# file directly — edit here and re-run both, never edit constants in the
+# scripts. Purchased-hardware dimensions (SG-90 servo envelope, spline,
+# horn screw) are fixed properties of the parts and live in
+# gripper_geometry.py instead.
+
+drive:
+  pin_count: 8               # lantern-pinion pins (the printed gear teeth)
+  pitch_radius: 9.0          # pin circle radius; jaw stroke = radius * swing
+  pin_d: 4.5                 # printed pin diameter
+  pin_length: 7.0            # cantilevered from the flange; racks mesh inside
+  profile_clearance: 0.25    # hob cutter radius margin over the pin radius
+  servo_torque_nm: 0.13      # SG-90 sustained working torque (stall 0.176)
+  mesh_efficiency: 0.9       # pin-on-trochoid, greased PETG
+  servo_travel_deg: 160      # usable swing (nominal 180, keep end margins)
+
+jaws:
+  max_opening: 36.0          # pad face to pad face; stroke per jaw = half this
+  finger_length: 16.0        # beyond the housing face plate
+  finger_thickness: 5.0
+  finger_height: 16.0
+  pad_thickness: 3.0         # printed TPU pads
+  pad_proud: 2.0             # pad stand-off from the finger face (pocket 1 mm)
+  carrier_length: 26.0       # jaw slider length along its travel axis
+
+body:
+  wall: 4.0                  # printed shell wall
+  back_thickness: 5.0        # mounting back plate (bolts to the forearm tip)
+  slide_clearance: 0.35      # diametral/side clearance on printed sliding fits
+  running_gap: 0.5           # gap between the rack backs and their rails

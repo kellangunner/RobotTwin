@@ -1,0 +1,96 @@
+# RobotTwin elegant showcase — a choreographed demo that reads as phrases
+# rather than a list of moves.
+# Run:  python python/run_script.py --port COM3 python/examples/elegant_showcase.txt
+# Preview (no hardware):
+#   python python/run_script.py --dry-run --start 0,90,-90 python/examples/elegant_showcase.txt
+#
+# How the elegance is actually achieved -- three rules, all forced by the rig:
+#
+#   1. ONE JOINT PER MOVE. The runner splits a multi-joint MOVEJ into sequential
+#      single-joint moves so the shared motor rail only ever drives one coil, so
+#      a two-joint line would execute as two moves with a hitch between them.
+#      Every MOVEJ below turns exactly one joint: the script reads the way the
+#      arm actually moves.
+#
+#   2. GESTURES, NOT STEPS. Consecutive MOVEJ lines run back to back -- the
+#      runner sends the next the instant EV MOVE_DONE arrives. So moves with no
+#      SLEEP between them chain into one continuous gesture, and SLEEP is used
+#      only where a pause is meant to be seen. Read the blank lines as breaths.
+#
+#   3. MODEST MOVES, ON PURPOSE. min_move_duration_s floors a short move at
+#      0.25 s, so small moves are unhurried and controlled. Elbow moves are kept
+#      to <= 24 deg (the bench proved 10 deg clean and 90 deg stalling), shoulder
+#      moves to <= 20 deg. The base is direct-drive with no reduction to slow it,
+#      so it is the one axis that can whip -- it gets a single long sweep as the
+#      centerpiece and short moves everywhere else.
+#
+# Posture: the shoulder stays in the 72-104 band (near vertical) and the elbow
+# never opens past -66, so the arm's mass stays tucked over the base and the
+# straight-arm singularity at elbow 0 is never approached.
+
+PING
+ENABLE
+
+# Datum: place the arm at base 0deg, shoulder 90deg (upper arm vertical),
+# elbow -90deg before running. Adjust to wherever the arm actually is.
+SETHOME 0 90 -90
+PAYLOAD 0
+TELEM 2
+
+# --- I. Greeting ------------------------------------------------------------
+# Lean in and open the forearm as one motion, hold the bow, then straighten.
+MOVEJ 0 76 -90
+MOVEJ 0 76 -68
+SLEEP 1
+MOVEJ 0 76 -92
+MOVEJ 0 92 -92
+SLEEP 1
+
+# --- II. The pan ------------------------------------------------------------
+# Gather the forearm in first: tucked mass is a short moment arm, so the long
+# sweep costs almost nothing. Then a pendulum -- out, across, back to center.
+MOVEJ 0 92 -114
+MOVEJ -75 92 -114
+SLEEP 1
+
+# The centerpiece: one uninterrupted 150 deg sweep on the gravity-free axis.
+MOVEJ 75 92 -114
+SLEEP 1
+MOVEJ 0 92 -114
+SLEEP 1
+
+# --- III. The reach ---------------------------------------------------------
+# Drop the shoulder, then unfold the elbow in two chained steps so the forearm
+# extends as one slow line instead of one lunge. Hold, then withdraw the same
+# way in reverse.
+MOVEJ 0 72 -114
+MOVEJ 0 72 -90
+MOVEJ 0 72 -66
+SLEEP 2
+MOVEJ 0 72 -90
+MOVEJ 0 72 -114
+MOVEJ 0 92 -114
+SLEEP 1
+
+# --- IV. Diagonals ----------------------------------------------------------
+# Alternating base and shoulder traces a diagonal across the workspace; the
+# elbow adds a small flourish at the far corner.
+MOVEJ 65 92 -114
+MOVEJ 65 104 -114
+MOVEJ 65 104 -92
+SLEEP 1
+MOVEJ 65 104 -114
+MOVEJ -65 104 -114
+MOVEJ -65 84 -114
+SLEEP 1
+
+# --- V. Return --------------------------------------------------------------
+# Unwind to the datum in the order the arm left it: base, then shoulder, then
+# elbow -- the pose it was placed in at the start.
+MOVEJ 0 84 -114
+MOVEJ 0 90 -114
+MOVEJ 0 90 -90
+SLEEP 1
+
+TELEM 0
+DISABLE

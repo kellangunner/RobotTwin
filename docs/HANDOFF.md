@@ -169,7 +169,9 @@ never a code change.
 
 **Pin summary** (from `firmware.yaml`): base STEP/DIR = D4/D27, shoulder =
 D18/D19, elbow = D21/D22, shared EN = D23, UART TX = D26 (→ 1 kΩ → driver
-**RX**, write-only), gripper servo = D13 (reserved, unused). Driver UART
+**RX**, write-only), gripper relay TX = D13 (→ 1 kΩ → Arduino Uno D2; the
+SG-90 runs off that separate board, not this one — reserved, not yet
+wired on the bench rig). Driver UART
 addresses: base 0, shoulder 1, elbow 2 (MS1/MS2 straps).
 
 ---

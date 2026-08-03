@@ -92,6 +92,7 @@ const char* verbName(CommandType type) {
     case CommandType::SetPayload: return "PAYLOAD";
     case CommandType::SetTelemetry: return "TELEM";
     case CommandType::SetHome: return "SETHOME";
+    case CommandType::SetGrip: return "GRIP";
   }
   return "?";
 }
@@ -131,6 +132,13 @@ CommandParse parseCommandLine(const std::string& line) {
     return okCommand({.type = CommandType::SetHome,
                       .q = {deg2rad(v[0]), deg2rad(v[1]), deg2rad(v[2])}});
   }
+  if (verb == "GRIP") {
+    // Only the sign is checked here; the upper bound is the mechanism's
+    // max_opening_mm, which lives in the firmware config, not the codec.
+    if (!parseArgs(tok, 1, v, err)) return fail(err);
+    if (v[0] < 0) return fail("opening must be >= 0");
+    return okCommand({.type = CommandType::SetGrip, .value = mm2m(v[0])});
+  }
   if (verb == "PAYLOAD") {
     if (!parseArgs(tok, 1, v, err)) return fail(err);
     if (v[0] < 0) return fail("payload must be >= 0");
@@ -162,9 +170,9 @@ std::string formatError(const char* reason, const std::string& detail) {
 }
 
 std::string formatState(const StateReport& s) {
-  return fmt("ST %.3f %.3f %.3f %s homed=%d en=%d payload=%.0f", rad2deg(s.q[0]),
+  return fmt("ST %.3f %.3f %.3f %s homed=%d en=%d payload=%.0f grip=%.1f", rad2deg(s.q[0]),
              rad2deg(s.q[1]), rad2deg(s.q[2]), s.mode, s.homed ? 1 : 0, s.enabled ? 1 : 0,
-             s.payloadKg * 1000.0);
+             s.payloadKg * 1000.0, m2mm(s.gripOpening));
 }
 
 std::string formatEvent(const char* name, const std::string& detail) {
@@ -180,5 +188,7 @@ std::string formatMoveJoints(const JointAngles& q) {
 std::string formatMoveLinear(const Vec3& target) {
   return fmt("MOVEL %.3f %.3f %.3f", m2mm(target[0]), m2mm(target[1]), m2mm(target[2]));
 }
+
+std::string formatGrip(double openingM) { return fmt("GRIP %.2f", m2mm(openingM)); }
 
 } // namespace rt::proto

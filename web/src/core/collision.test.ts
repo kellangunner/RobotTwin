@@ -86,8 +86,9 @@ describe('pose collision checks', () => {
     const res = checkPose(pose(0, 90, -150), geom, model);
     expect(res.colliding).toBe(true);
     expect(res.issues.join()).toContain('shoulder');
-    // slightly less fold clears it
-    expect(checkPose(pose(0, 90, -140), geom, model).issues).toEqual([]);
+    // -130 is the safe bracket: the shoulder housing is met from -148 (with
+    // the 75 mm gripper the tip no longer reaches the ground at q2 = 90)
+    expect(checkPose(pose(0, 90, -130), geom, model).issues).toEqual([]);
   });
 
   it('is base-yaw invariant for the symmetric structure', () => {

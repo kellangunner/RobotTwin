@@ -79,8 +79,8 @@ RT_TEST(gravity_worst_case_at_full_horizontal_extension) {
   const RobotConfig& cfg = config();
   const auto tau = gravityTorques({0, 0, 0}, cfg.links, cfg.masses, 0.1);
   CHECK_CLOSE(tau[0], 0.0, 1e-12);
-  CHECK_CLOSE(tau[1], 1.166, 5e-3); // hand-computed in docs/linkage-geometry.md
-  CHECK_CLOSE(tau[2], 0.294, 5e-3);
+  CHECK_CLOSE(tau[1], 1.095, 5e-3); // hand-computed in docs/linkage-geometry.md
+  CHECK_CLOSE(tau[2], 0.259, 5e-3);
 }
 
 RT_TEST(gravity_vanishes_with_arm_vertical) {

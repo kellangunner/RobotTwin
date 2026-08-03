@@ -177,7 +177,7 @@ build CMakeFiles/robottwin_wasm.dir/src/wasm/bindings.cpp.o: CXX_COMPILER__robot
 build C$:/Users/kgunner/Documents/GitHub/RobotTwin/web/src/wasm/robottwin.js: CXX_EXECUTABLE_LINKER__robottwin_wasm_Release CMakeFiles/robottwin_wasm.dir/src/wasm/bindings.cpp.o | librobottwin_core.a || librobottwin_core.a
   CONFIG = Release
   FLAGS = -O3 -DNDEBUG
-  LINK_FLAGS = --bind -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createRobotTwinModule -sALLOW_MEMORY_GROWTH=1 -sENVIRONMENT=web
+  LINK_FLAGS = --bind -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createRobotTwinModule -sALLOW_MEMORY_GROWTH=1 -sENVIRONMENT=web -sGROWABLE_ARRAYBUFFERS=0
   LINK_LIBRARIES = librobottwin_core.a
   OBJECT_DIR = CMakeFiles\robottwin_wasm.dir
   POST_BUILD = cd .

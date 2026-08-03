@@ -10,12 +10,14 @@
 //                  MOVEJ <θ1°> <θ2°> <θ3°>
 //                  MOVEL <x mm> <y mm> <z mm>
 //                  SETHOME <θ1°> <θ2°> <θ3°>   (manual datum; no switches)
+//                  GRIP <opening mm>
 //                  PAYLOAD <grams>
 //                  TELEM <hz>
 //   robot → host:  PONG <name> <version>
 //                  OK <verb> [T=<s> STRETCH=<k>]
 //                  ERR <reason> <detail…>
 //                  ST <θ1°> <θ2°> <θ3°> <mode> homed=<0|1> en=<0|1> payload=<g>
+//                     grip=<mm>
 //                  EV <name> [detail…]
 #pragma once
 
@@ -41,6 +43,7 @@ enum class CommandType : int {
   SetTelemetry, // value = Hz
   SetHome,      // q (rad, from degrees) — declare the arm's current pose as
                 // the datum (manual homing; no limit switches required)
+  SetGrip,      // value = m of jaw opening (mm on the wire)
 };
 
 struct Command {
@@ -81,6 +84,7 @@ struct StateReport {
   bool homed = false;
   bool enabled = false;
   double payloadKg = 0;
+  double gripOpening = 0; // m — commanded jaw opening (mm on the wire)
 };
 
 // ---- reply / event formatting (robot → host); no trailing newline ----
@@ -94,5 +98,6 @@ std::string formatEvent(const char* name, const std::string& detail = "");
 // ---- host-side helpers (round-trip tested against the parser) ----
 std::string formatMoveJoints(const JointAngles& q);
 std::string formatMoveLinear(const Vec3& target);
+std::string formatGrip(double openingM);
 
 } // namespace rt::proto

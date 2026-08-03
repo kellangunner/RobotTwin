@@ -99,7 +99,8 @@ works:
 This arm has **no limit switches** (none designed in, no hard stops to mount
 them against); the datum is set in firmware with `SETHOME`, so nothing wires
 to a switch input. Leave empty: ESP32 VIN (USB powers the board — **never**
-the motor PSU), D13 (reserved for the future gripper servo), GPIO32/33/25
+the motor PSU), D13 (reserved for the relay link to the gripper node's
+Arduino — the servo runs off that board, not this one), GPIO32/33/25
 (free — no switches), driver CLK pins if present.
 
 ## ESP32 module

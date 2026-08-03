@@ -66,6 +66,11 @@ void MotionController::init(const rt::RobotConfig& robot, const rt::HardwareConf
     gpio_set_pull_mode(pin, lim.activeLow ? GPIO_PULLUP_ONLY : GPIO_PULLDOWN_ONLY);
   }
 
+  grip_.init(hw.gripper);
+  gripLink_.init(hw.gripper);
+  gripOpening_ = hw.gripper.bootOpening;
+  gripRequest_ = hw.gripper.bootOpening;
+
   events_ = xQueueCreate(8, sizeof(Event));
 
   // Core 1 keeps the 1 kHz cadence away from the main (console/planning) task.
@@ -77,6 +82,14 @@ void MotionController::init(const rt::RobotConfig& robot, const rt::HardwareConf
 
 CmdResult MotionController::enable() {
   steps_->setEnabled(true);
+  // The servo has no enable line of its own, so ENABLE is also what starts
+  // relaying commands to it. It snaps to the last commanded opening, which
+  // after a boot or a DISABLE is an assumption (gripper.boot_opening_mm) rather
+  // than a measurement — park the jaws there before powering up.
+  portENTER_CRITICAL(&mux_);
+  gripDriven_ = true;
+  gripFreeze_ = true;  // hold the current opening, and re-arm release_after_s
+  portEXIT_CRITICAL(&mux_);
   return {};
 }
 
@@ -87,6 +100,9 @@ CmdResult MotionController::disable() {
   steps_->haltAll();
   if (mode_ != Mode::Fault) mode_ = Mode::Idle;
   homed_ = false;
+  gripDriven_ = false;  // nothing on the robot stays energized after DISABLE
+  gripFreeze_ = true;   // …and a slack servo is not slewing anywhere
+  gripPending_ = false;
   portEXIT_CRITICAL(&mux_);
   steps_->setEnabled(false);
   return {};
@@ -96,6 +112,8 @@ CmdResult MotionController::stop() {
   // Also the fault-recovery verb: freeze everything, back to IDLE.
   portENTER_CRITICAL(&mux_);
   steps_->haltAll();
+  gripFreeze_ = true;  // jaws hold where they are; STOP must not drop a part
+  gripPending_ = false;  // …including a GRIP that raced the STOP
   mode_ = Mode::Idle;
   portEXIT_CRITICAL(&mux_);
   return {};
@@ -195,6 +213,33 @@ CmdResult MotionController::moveLinear(const rt::Vec3& target) {
   return planAndStart(best->q);
 }
 
+CmdResult MotionController::setGrip(double openingM) {
+  // Not routed through guard(): the gripper is a separate actuator, so it may
+  // be commanded while the arm is mid-move (approach and close in one script)
+  // and it does not care whether the arm has a datum. FAULT still blocks —
+  // that is the "touch nothing until you have looked" state — and the servo
+  // needs ENABLE, which is what energizes it.
+  if (currentMode() == Mode::Fault) return err(kFault, "send STOP to clear the fault");
+  if (openingM < 0 || openingM > hw_.gripper.maxOpening) {
+    char detail[64];
+    std::snprintf(detail, sizeof detail, "opening must be 0..%.1f mm",
+                  rt::m2mm(hw_.gripper.maxOpening));
+    return err(kLimits, detail);
+  }
+
+  bool driven = false;
+  portENTER_CRITICAL(&mux_);
+  driven = gripDriven_;
+  if (driven) {
+    gripRequest_ = openingM;
+    gripPending_ = true;
+    gripFreeze_ = false;
+  }
+  portEXIT_CRITICAL(&mux_);
+  if (!driven) return err(kDisabled, "gripper servo unpowered; send ENABLE");
+  return {};
+}
+
 CmdResult MotionController::setPayload(double kg) {
   if (kg > robot_.masses.payloadMax)
     return err(kLimits, "payload exceeds configured maximum");
@@ -243,6 +288,7 @@ rt::proto::StateReport MotionController::state() const {
   s.enabled = steps_->enabled();
   portENTER_CRITICAL(&mux_);
   s.homed = homed_;
+  s.gripOpening = gripOpening_;
   switch (mode_) {
     case Mode::Idle: s.mode = "IDLE"; break;
     case Mode::Homing: s.mode = "HOMING"; break;
@@ -316,6 +362,8 @@ void MotionController::postEvent(const char* name, const char* detail) {
 void MotionController::fault(const char* what, const char* which) {
   portENTER_CRITICAL(&mux_);
   steps_->haltAll();
+  gripFreeze_ = true;  // keep holding whatever is in the jaws
+  gripPending_ = false;
   mode_ = Mode::Fault;
   homed_ = false;
   portEXIT_CRITICAL(&mux_);
@@ -337,12 +385,58 @@ void MotionController::controlTask() {
 }
 
 void MotionController::tick() {
+  const int64_t nowUs = esp_timer_get_time();
   switch (currentMode()) {
-    case Mode::Moving: tickMoving(esp_timer_get_time()); break;
-    case Mode::Homing: tickHoming(esp_timer_get_time()); break;
+    case Mode::Moving: tickMoving(nowUs); break;
+    case Mode::Homing: tickHoming(nowUs); break;
     case Mode::Idle:
     case Mode::Fault: break;
   }
+  // Outside the state machine on purpose: the jaws keep slewing (and holding)
+  // whatever the arm is doing.
+  tickGripper(nowUs);
+}
+
+void MotionController::tickGripper(int64_t nowUs) {
+  // Measure the real tick period rather than trusting 1/loop_hz — the actual
+  // cadence is quantized by the FreeRTOS tick, and the slew rate should be the
+  // one the config asked for.
+  const double dt =
+      gripTickUs_ == 0 ? 0.0 : static_cast<double>(nowUs - gripTickUs_) * 1e-6;
+  gripTickUs_ = nowUs;
+
+  double request = 0;
+  bool pending = false;
+  bool freeze = false;
+  bool driven = false;
+  portENTER_CRITICAL(&mux_);
+  request = gripRequest_;
+  pending = gripPending_;
+  freeze = gripFreeze_;
+  driven = gripDriven_;
+  gripPending_ = false;
+  gripFreeze_ = false;
+  portEXIT_CRITICAL(&mux_);
+
+  if (freeze) grip_.freeze();
+  if (pending) grip_.setOpening(request);
+  const bool landed = grip_.advance(dt);
+
+  portENTER_CRITICAL(&mux_);
+  gripOpening_ = grip_.opening();
+  portEXIT_CRITICAL(&mux_);
+
+  // Send the destination, not the current position: the Arduino runs the same
+  // rt::GripperAxis from the same calibration, so it slews there on its own and
+  // the link stays quiet during the move. GripperLink drops repeats, which is
+  // what keeps a 1 kHz loop off a 19200 baud wire.
+  if (driven && grip_.driving()) {
+    gripLink_.send(grip_.target());
+  } else {
+    gripLink_.release();
+  }
+
+  if (landed && driven) postEvent("GRIP_DONE", "");
 }
 
 void MotionController::tickMoving(int64_t nowUs) {

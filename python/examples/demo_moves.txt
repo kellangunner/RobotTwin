@@ -1,0 +1,23 @@
+# RobotTwin demo script — safe, slow, unloaded bench moves.
+# Run:  python python/run_script.py --port COM3 python/examples/demo_moves.txt
+# Preview without hardware:
+#   python python/run_script.py --dry-run --start 0,90,-90 python/examples/demo_moves.txt
+
+PING
+ENABLE
+
+# Declare the arm's current parked pose as the datum (this arm has no limit
+# switches). Adjust these angles to wherever the arm actually is.
+SETHOME 0 90 -90
+
+# A multi-joint move: the runner sends this as three single-joint moves so the
+# shared motor rail only ever powers one moving coil at a time.
+MOVEJ 30 60 -60
+
+# Let the drivers cool a moment on the breadboard rig.
+SLEEP 2
+
+# Back to the datum pose, again one joint at a time.
+MOVEJ 0 90 -90
+
+DISABLE

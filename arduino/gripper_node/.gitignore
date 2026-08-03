@@ -1,0 +1,6 @@
+# PlatformIO build tree
+.pio/
+
+# Generated from the gripper: block of config/firmware.yaml at build time
+# (scripts/gen_gripper_config.py)
+src/gripper_config_gen.hpp

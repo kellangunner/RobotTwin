@@ -93,6 +93,7 @@ std::string SerialConsole::handleLine(const std::string& line) {
     case CT::MoveLinear: r = controller_->moveLinear(cmd.target); break;
     case CT::SetHome: r = controller_->setHome(cmd.q); break;
     case CT::SetPayload: r = controller_->setPayload(cmd.value); break;
+    case CT::SetGrip: r = controller_->setGrip(cmd.value); break;
     default: return proto::formatError(proto::reason::kParse, "unhandled command");
   }
 

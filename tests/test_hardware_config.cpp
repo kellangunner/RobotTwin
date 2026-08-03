@@ -82,6 +82,43 @@ RT_TEST(firmware_config_converts_homing_values_to_si) {
   CHECK_CLOSE(lim.backoff, deg2rad(4), 1e-12);
 }
 
+RT_TEST(firmware_config_converts_gripper_values_to_si) {
+  const auto& g = config().gripper;
+  // pin/knob_pin address the Arduino that drives the servo; relay_pin is the
+  // only one of the three the ESP32 itself configures.
+  CHECK(g.pin == 9);
+  CHECK(g.relayPin == 13);
+  CHECK(g.relayRxPin == 2);
+  CHECK(g.relayBaud == 19200);
+  CHECK(g.knobPin == 14);
+  CHECK_CLOSE(g.pwmHz, 50, 1e-12);
+  CHECK_CLOSE(s2us(g.closedPulse), 1200, 1e-9);
+  CHECK_CLOSE(s2us(g.openPulse), 1800, 1e-9);
+  CHECK_CLOSE(m2mm(g.maxOpening), 30.0, 1e-12);
+  CHECK_CLOSE(m2mm(g.speed), 40.0, 1e-12);
+  CHECK_CLOSE(m2mm(g.bootOpening), 30.0, 1e-12);
+  CHECK_CLOSE(g.releaseAfter, 0, 1e-12);
+}
+
+RT_TEST(firmware_config_rejects_bad_gripper_values) {
+  // Outside a hobby servo's window, or longer than the frame it lives in.
+  CHECK(throws(withReplacement("open_pulse_us: 1800", "open_pulse_us: 3000")));
+  CHECK(throws(withReplacement("closed_pulse_us: 1200", "closed_pulse_us: 100")));
+  CHECK(throws(withReplacement("pwm_hz: 50", "pwm_hz: 5")));
+  // A calibration with no span between the two ends is a typo, not a gripper.
+  CHECK(throws(withReplacement("open_pulse_us: 1800", "open_pulse_us: 1210")));
+  CHECK(throws(withReplacement("max_opening_mm: 30.0", "max_opening_mm: 0")));
+  CHECK(throws(withReplacement("speed_mm_s: 40.0", "speed_mm_s: 0")));
+  // The jaws cannot boot wider than they open.
+  CHECK(throws(withReplacement("boot_opening_mm: 30.0", "boot_opening_mm: 45")));
+  CHECK(throws(withReplacement("release_after_s: 0", "release_after_s: -1")));
+  // GPIO34-39 are input-only, so they cannot drive the relay's UART TX.
+  CHECK(throws(withReplacement("relay_pin: 13", "relay_pin: 36")));
+  CHECK(throws(withReplacement("relay_baud: 19200", "relay_baud: 300")));
+  // D0/D1 carry the Uno's USB console, so the relay cannot land there.
+  CHECK(throws(withReplacement("relay_rx_pin: 2", "relay_rx_pin: 0")));
+}
+
 RT_TEST(firmware_config_loads_homing_order) {
   const auto& order = config().homingOrder;
   CHECK(order[0] == Joint::Elbow);

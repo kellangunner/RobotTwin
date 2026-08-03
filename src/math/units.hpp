@@ -16,6 +16,8 @@ constexpr double rad2deg(double r) { return r * 180.0 / kPi; }
 constexpr double mm2m(double mm) { return mm / 1000.0; }
 constexpr double m2mm(double m) { return m * 1000.0; }
 constexpr double g2kg(double g) { return g / 1000.0; }
+constexpr double us2s(double us) { return us / 1e6; }
+constexpr double s2us(double s) { return s * 1e6; }
 constexpr double rpm2radps(double rpm) { return rpm * 2.0 * kPi / 60.0; }
 constexpr double gcm2ToKgm2(double gcm2) { return gcm2 * 1e-7; }
 

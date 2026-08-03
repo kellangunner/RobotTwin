@@ -22,10 +22,12 @@
 #include "freertos/queue.h"
 
 #include "config/config.hpp"
+#include "hardware/gripper.hpp"
 #include "hardware/hardware_config.hpp"
 #include "hardware/serial_protocol.hpp"
 #include "math/vec3.hpp"
 #include "planning/trajectory.hpp"
+#include "gripper_link.hpp"
 #include "step_engine.hpp"
 
 namespace fw {
@@ -60,6 +62,7 @@ class MotionController {
   CmdResult moveLinear(const rt::Vec3& target);
   CmdResult setHome(const rt::JointAngles& q);
   CmdResult setPayload(double kg);
+  CmdResult setGrip(double openingM);
 
   rt::proto::StateReport state() const;
 
@@ -75,6 +78,7 @@ class MotionController {
   void tick();
   void tickMoving(int64_t nowUs);
   void tickHoming(int64_t nowUs);
+  void tickGripper(int64_t nowUs);
   void enterPhase(HomePhase phase);
   void fault(const char* what, const char* which);
 
@@ -100,6 +104,27 @@ class MotionController {
   // active move (written at install under mux_, read each control tick)
   rt::TrajectoryPlan plan_{};
   int64_t moveStartUs_ = 0;
+
+  // Gripper axis. The servo is independent of the steppers — no trajectory, no
+  // torque governor, no homing — so it lives beside the state machine rather
+  // than inside it: it keeps slewing in every mode. rt::GripperAxis itself is
+  // touched only by the control task; commands cross from the console task as
+  // the small guarded block below (double writes are not atomic here).
+  //
+  // The servo hangs off an Arduino now, not this board, so grip_ is a model
+  // rather than a driver: it exists to time GRIP_DONE and to fill in grip= on
+  // the ST line. The Arduino runs the same class from the same config, so the
+  // two slew together. This was always open loop — the model is exactly as
+  // truthful as it was when the PWM was local. One new caveat: turning the
+  // Arduino's manual knob mid-script leaves grip_ stale until the next GRIP.
+  rt::GripperAxis grip_{};
+  GripperLink gripLink_{};
+  int64_t gripTickUs_ = 0;   // control task only — measured tick period
+  double gripRequest_ = 0;   // m, under mux_
+  bool gripPending_ = false; // under mux_ — a new opening is waiting
+  bool gripFreeze_ = false;  // under mux_ — STOP: stay where you are
+  bool gripDriven_ = false;  // under mux_ — ENABLE energizes, DISABLE cuts
+  double gripOpening_ = 0;   // m, under mux_ — published to STATE
 
   // homing state machine (control task only, except the mode transitions)
   int homingIdx_ = 0;

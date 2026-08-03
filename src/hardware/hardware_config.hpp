@@ -10,6 +10,7 @@
 #include <string>
 
 #include "../config/config.hpp"
+#include "gripper_config.hpp"
 
 namespace rt {
 
@@ -30,6 +31,9 @@ struct JointPinsConfig {
   int uartAddress; // TMC2209 MS1/MS2 strap address (0..3)
   LimitSwitchConfig limit;
 };
+
+// GripperConfig lives in gripper_config.hpp — the Arduino Uno that now drives
+// the servo needs it without the rest of this header's dependencies.
 
 struct HardwareConfig {
   std::string name;
@@ -53,6 +57,8 @@ struct HardwareConfig {
   int tmcUartBaud;
   int tmcIrun;  // 0..31
   int tmcIhold; // 0..31
+
+  GripperConfig gripper;
 
   std::array<Joint, kNumJoints> homingOrder;
   std::array<JointPinsConfig, kNumJoints> joints; // indexed by Joint

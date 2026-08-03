@@ -1,0 +1,37 @@
+# RobotTwin showcase — a four-move joint-space demo off the 0/90/-90 datum.
+# Run:  python python/run_script.py --port COM5 python/examples/showcase.txt
+# Preview (no hardware):
+#   python python/run_script.py --dry-run --start 0,90,-90 python/examples/showcase.txt
+
+PING
+ENABLE
+
+# Datum: declare the arm's current parked pose. Place the arm at base 0deg,
+# shoulder 90deg (upper arm vertical), elbow -90deg before running.
+SETHOME 0 90 -90
+
+# Stream live joint state so the motion is visible in the console.
+TELEM 2
+
+# 1) swing the base out to +45
+MOVEJ 45 90 -90
+SLEEP 1
+
+# 2) drop the shoulder to 45
+MOVEJ 45 45 -90
+SLEEP 1
+
+# 3) open the elbow out to 0 (arm reaches forward)
+MOVEJ 45 45 0
+SLEEP 1
+
+# 4) sweep the base across to -45
+MOVEJ -45 45 0
+SLEEP 1
+
+# 5) bend the arm down
+MOVEJ -45 45 90
+SLEEP 1
+
+TELEM 0
+DISABLE

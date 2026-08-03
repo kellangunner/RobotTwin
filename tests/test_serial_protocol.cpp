@@ -60,6 +60,19 @@ RT_TEST(protocol_parses_payload_grams_to_kilograms) {
   CHECK(!parseCommandLine("PAYLOAD -1").ok);
 }
 
+RT_TEST(protocol_parses_grip_millimeters_to_meters) {
+  const auto r = parseCommandLine("GRIP 24.5");
+  CHECK(r.ok);
+  CHECK(r.command.type == CommandType::SetGrip);
+  CHECK_CLOSE(r.command.value, 0.0245, 1e-12);
+  CHECK(parseCommandLine("GRIP 0").ok);            // fully closed
+  CHECK(!parseCommandLine("GRIP -1").ok);
+  CHECK(!parseCommandLine("GRIP").ok);             // arity
+  CHECK(!parseCommandLine("GRIP wide").ok);        // not a number
+  // The upper bound is the mechanism's, checked by the firmware, not the codec.
+  CHECK(parseCommandLine("GRIP 999").ok);
+}
+
 RT_TEST(protocol_parses_telemetry_rate) {
   const auto r = parseCommandLine("TELEM 10");
   CHECK(r.ok);
@@ -88,6 +101,10 @@ RT_TEST(protocol_host_formatters_round_trip_through_parser) {
   const auto rl = parseCommandLine(formatMoveLinear(t));
   CHECK(rl.ok);
   for (int i = 0; i < 3; ++i) CHECK_CLOSE(rl.command.target[i], t[i], 1e-6);
+
+  const auto rg = parseCommandLine(formatGrip(0.0185));
+  CHECK(rg.ok);
+  CHECK_CLOSE(rg.command.value, 0.0185, 1e-6);
 }
 
 RT_TEST(protocol_formats_replies) {
@@ -108,7 +125,8 @@ RT_TEST(protocol_formats_state_line) {
   s.homed = true;
   s.enabled = true;
   s.payloadKg = 0.15;
-  CHECK(formatState(s) == "ST 10.000 90.000 -90.000 IDLE homed=1 en=1 payload=150");
+  s.gripOpening = 0.0245;
+  CHECK(formatState(s) == "ST 10.000 90.000 -90.000 IDLE homed=1 en=1 payload=150 grip=24.5");
 }
 
 RT_TEST(protocol_verb_names_match_wire_verbs) {
@@ -116,4 +134,5 @@ RT_TEST(protocol_verb_names_match_wire_verbs) {
   CHECK(std::string(verbName(CommandType::MoveJoints)) == "MOVEJ");
   CHECK(std::string(verbName(CommandType::SetTelemetry)) == "TELEM");
   CHECK(std::string(verbName(CommandType::SetHome)) == "SETHOME");
+  CHECK(std::string(verbName(CommandType::SetGrip)) == "GRIP");
 }

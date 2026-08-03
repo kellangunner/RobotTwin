@@ -1,0 +1,35 @@
+# RobotTwin gripper checkout — first motion of the SG-90 jaw axis, arm parked.
+# Run:  python python/run_script.py --port COM5 python/examples/gripper_checkout.txt
+# Preview without hardware:
+#   python python/run_script.py --dry-run python/examples/gripper_checkout.txt
+
+PING
+ENABLE
+
+# No arm datum needed: GRIP is a separate axis and never asks about SETHOME.
+
+# Full stroke, one end to the other, with a beat to look at each pose.
+GRIP 0
+SLEEP 1
+GRIP 30
+SLEEP 1
+
+# Mid-stroke stops — this is what proves the mapping is linear rather than
+# just hitting two stops. Each should land a quarter of the way along.
+GRIP 22.5
+SLEEP 1
+GRIP 15
+SLEEP 1
+GRIP 7.5
+SLEEP 1
+
+# Close on a part: put something ~20 mm across between the pads first, and
+# command a little narrower than it so the jaws squeeze rather than kiss.
+GRIP 18
+SLEEP 2
+STATE
+
+# Release and park wide, which is where boot_opening_mm expects to find them
+# next time.
+GRIP 30
+DISABLE

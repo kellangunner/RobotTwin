@@ -1,3 +1,4 @@
+
 # Wiring & Bring-Up Guide
 
 How to wire the ESP32 controller to the three joint motors and get the arm
@@ -18,6 +19,7 @@ From the [BOM](BOM.md) electronics section:
 - Motor PSU: 12–24 V DC, ≥5 A at 12 V (24 V preferred for speed headroom)
 - USB cable (powers the ESP32 and carries the serial console)
 - Hookup wire; 1 × 1 kΩ resistor for the TMC2209 UART bus (TX → PDN_UART)
+- 1 × SG-90 hobby servo (the gripper's actuator) on 5 V
 
 A breadboard works for the smoke test, but solder or use crimped dupont/JST
 connections for anything that moves — a step pin that loses contact mid-move
@@ -30,15 +32,21 @@ step-by-step build for the dovetailed two-board bench in
 
 ## Power architecture
 
-Two independent supplies with a **common ground**:
+Three independent supplies with a **common ground**:
 
 - **Logic**: the ESP32 is powered over USB. Each TMC2209's VIO pin takes
   3.3 V from the ESP32's 3V3 pin.
 - **Motor power**: the 12–24 V PSU feeds each driver's VM/GND. Put one
   ≥100 µF electrolytic directly across VM/GND at each driver — TMC2209s die
   from inductive voltage spikes without it.
-- **Tie PSU ground to ESP32 GND.** Without the shared reference the
-  step/dir signals float and the drivers behave erratically.
+- **Gripper**: a bench supply at **5.0 V with a 1 A current limit** feeds the
+  servo, and the Arduino driving it runs off host USB. Nothing here is derived
+  from the motor supply — see "Gripper node".
+- **Tie PSU ground to ESP32 GND**, and the servo supply's − to both. Without
+  the shared reference the step/dir signals float, the drivers behave
+  erratically, and the relay link to the Arduino cannot be read at all.
+
+Only grounds are shared. No two of the three rails meet anywhere else.
 
 Rules that prevent dead drivers:
 
@@ -65,20 +73,25 @@ are consequently free.
 > spare. If your board *does* expose 16/17 and you'd rather use them, change
 > `joints.base.step_pin`/`dir_pin` in `firmware.yaml` and reflash.
 
-| Signal | ESP32 GPIO | Goes to |
-|---|---|---|
-| Base STEP | 4 | base driver STEP |
-| Base DIR | 27 | base driver DIR |
-| Shoulder STEP | 18 | shoulder driver STEP |
-| Shoulder DIR | 19 | shoulder driver DIR |
-| Elbow STEP | 21 | elbow driver STEP |
-| Elbow DIR | 22 | elbow driver DIR |
-| Driver ENABLE (shared) | 23 | EN on **all three** drivers (active-low) |
-| TMC UART TX | 26 | 1 kΩ → shared PDN_UART line, all three drivers |
+| Signal                 | ESP32 GPIO | Goes to                                          |
+| ---------------------- | ---------- | ------------------------------------------------ |
+| Base STEP              | 4          | base driver STEP                                 |
+| Base DIR               | 27         | base driver DIR                                  |
+| Shoulder STEP          | 18         | shoulder driver STEP                             |
+| Shoulder DIR           | 19         | shoulder driver DIR                              |
+| Elbow STEP             | 21         | elbow driver STEP                                |
+| Elbow DIR              | 22         | elbow driver DIR                                 |
+| Driver ENABLE (shared) | 23         | EN on**all three** drivers (active-low)    |
+| TMC UART TX            | 26         | 1 kΩ → shared PDN_UART line, all three drivers |
+| Gripper relay TX       | 13         | 1 kΩ → Arduino Uno D2 (gripper node)             |
 
-GPIO 13 is reserved for the future gripper axis — one 50 Hz servo-PWM
-channel for its SG-90 (no driver; budget ~650 mA of 5 V stall transient).
-Leave it free. GPIO32/33/25 are unused (no limit switches).
+**The servo does not connect to the ESP32.** It hangs off an Arduino Uno with
+its own supply, and GPIO 13 — which used to carry the servo's PWM directly —
+now carries commands to that Uno instead. The reasons are the ones this document
+used to list as warnings: a stalled SG-90 draws ~650 mA, which is exactly the
+transient that browns out the board generating step pulses, and an SG-90 wants
+5 V logic rather than the ESP32's 3.3 V. See "Gripper node" below.
+GPIO32/33/25 are unused (no limit switches).
 
 ```
                  ESP32 DevKit (WROOM-32)
@@ -93,6 +106,7 @@ Leave it free. GPIO32/33/25 are unused (no limit switches).
                 │ GPIO22 ─ DIR  ├─ elbow driver
                 │ GPIO23 ─ EN ──┴─┴─┴─ EN on all three (active-low)
                 │ GPIO26 ─ 1kΩ ─ PDN_UART bus (all three)
+                │ GPIO13 ─ 1kΩ ─ Uno D2 (gripper node, one-way)
                 └───────────────────────┘
 
      12–24 V PSU ──┬── VM/GND driver 1 (+100 µF cap at the driver)
@@ -100,19 +114,68 @@ Leave it free. GPIO32/33/25 are unused (no limit switches).
                    └── VM/GND driver 3 (+100 µF)
 ```
 
+## Gripper node (Arduino Uno)
+
+The SG-90 lives on its own board. The ESP32 sends it commands over a single
+wire and never hears back.
+
+| Uno pin | Connect to                                                       |
+| ------- | ---------------------------------------------------------------- |
+| D9      | SG-90 signal wire (orange)                                       |
+| A0      | Potentiometer wiper; the pot's two ends go to Uno 5 V and GND    |
+| D2      | ESP32 GPIO 13 through 1 kΩ — the relay link                       |
+| D3      | Nothing. Reserved for a return path                               |
+| GND     | Servo brown wire, servo supply −, **and** ESP32 GND               |
+| USB     | Host PC — power, sketch uploads, and the node's own console       |
+
+Servo power comes from a bench supply set to **5.0 V with a 1 A limit**, wired
+straight to the servo's red and brown wires. Fit a **470–1000 µF electrolytic
+plus a 0.1 µF ceramic across V+/GND at the servo connector**: a bench supply's
+regulation loop responds in milliseconds and the servo's inrush is faster than
+that, so the capacitor — not the supply — is what actually covers the
+transient.
+
+```
+        Arduino Uno                      bench PSU 5.0 V / 1 A limit
+       ┌─────────────┐                        │        │
+ USB ──┤ D9  ────────┼── SG-90 signal (orange)│        │
+       │ A0  ────────┼── knob wiper           │        │
+       │ D2  ◄─ 1kΩ ─┼── ESP32 GPIO13         ├── red ─┴─ SG-90 V+
+       │ D13 (LED)   │                        │       (+470–1000 µF here)
+       │ GND ────────┼────────────────────────┴── brown ── SG-90 GND
+       └─────────────┘         └── star ground: also ESP32 GND, PSU −
+```
+
+Three things that will bite you:
+
+- **Never feed 5 V into the Uno's barrel jack.** That input runs through the
+  onboard AMS1117 regulator, which needs ~6.5 V; 5 V there leaves the board's
+  5 V rail near 3.9 V and erratic. A 5 V source goes into the USB connector.
+- **Never jumper the servo supply onto the Uno's 5V pin.** The rails stay
+  separate; only the grounds meet.
+- **The relay must not land on D0 or D1.** Those are the Uno's hardware UART,
+  wired to its USB chip — using them would fight the console and break sketch
+  uploads. That is why D2 is a `SoftwareSerial` receive pin.
+
+The 3.3 V the ESP32 drives into D2 is above the Uno's 3.0 V logic-high
+threshold, so it reads correctly, but only by 0.3 V. If bring-up shows garbled
+bytes, drop `relay_baud` to 9600 before reaching for a level shifter.
+
+Build and flash it from `arduino/gripper_node/` — see the README there.
+
 ## Per-driver wiring (TMC2209 carrier)
 
 Each of the three drivers gets:
 
-| Driver pin | Connect to |
-|---|---|
-| VM / GND (motor side) | PSU + / PSU − , with the 100 µF cap across them |
-| VIO / GND (logic side) | ESP32 3V3 / GND |
-| STEP, DIR | the joint's GPIOs from the pin map |
-| EN | GPIO23 (shared by all three) |
-| A1, A2, B1, B2 | one motor coil per pair (see below) |
-| MS1, MS2 | UART address straps — per the table below |
-| PDN_UART | shared bus from GPIO26 (through the 1 kΩ) |
+| Driver pin             | Connect to                                        |
+| ---------------------- | ------------------------------------------------- |
+| VM / GND (motor side)  | PSU + / PSU − , with the 100 µF cap across them |
+| VIO / GND (logic side) | ESP32 3V3 / GND                                   |
+| STEP, DIR              | the joint's GPIOs from the pin map                |
+| EN                     | GPIO23 (shared by all three)                      |
+| A1, A2, B1, B2         | one motor coil per pair (see below)               |
+| MS1, MS2               | UART address straps — per the table below        |
+| PDN_UART               | shared bus from GPIO26 (through the 1 kΩ)        |
 
 **Motor coils:** a 4-wire bipolar stepper has two coils. Find the pairs with
 a multimeter (a coil pair shows a few ohms; across coils is open). One pair
@@ -141,11 +204,11 @@ selects — the firmware pushes the microstep resolution (1/16, from
 Strap each driver to match its `uart_address` in `firmware.yaml`, and
 note every driver needs a **unique** address:
 
-| Joint | Address | MS1 | MS2 |
-|---|---|---|---|
-| base | 0 | GND | GND |
-| shoulder | 1 | VIO | GND |
-| elbow | 2 | GND | VIO |
+| Joint    | Address | MS1 | MS2 |
+| -------- | ------- | --- | --- |
+| base     | 0       | GND | GND |
+| shoulder | 1       | VIO | GND |
+| elbow    | 2       | GND | VIO |
 
 Wire GPIO26 through the single 1 kΩ resistor, then bus it to all three
 PDN_UART pins tied together. The link is write-only — nothing is read
@@ -252,31 +315,130 @@ hardware with the same `ERR TORQUE` / `ERR COLLISION` verdict. A
 `STRETCH` greater than 1.00 means the torque governor slowed the move to
 stay under the torque ceiling; that's normal for aggressive targets.
 
+### 5. Gripper calibration
+
+Do this once, with the arm parked and nothing between the jaws. **Do it against
+the Uno alone** — the ESP32 does not need to be powered or even connected, which
+is most of the reason the gripper has its own board. The whole model of the
+gripper is two pulse widths and the opening they correspond to, all in the
+`gripper:` block of `config/firmware.yaml`, and each edit needs a reflash of the
+gripper node (`pio run -t upload` in `arduino/gripper_node/`). The shipped values
+(1200 / 1800 µs over a nominal 30 mm) are deliberately narrow: a servo driven
+past a mechanical stop stalls, draws ~650 mA and strips its own gears within
+seconds, so you **widen toward the ends**, never start at them.
+
+Set the bench supply to 5.0 V with a **1 A limit** and leave its current readout
+where you can see it. That limit is the safety net for this whole procedure: if
+it trips, the pulse span is driving the mechanism into a hard stop, and the fix
+is to narrow the calibration rather than push on. Expect roughly 200 mA while
+moving.
+
+Open the jaws by hand to `boot_opening_mm` before powering up. The node drives
+nothing until its first command, so the jaws will not jump on power-on — but the
+first `G` will snap them from the assumed opening to the commanded one.
+
+Talk to it directly over its USB console (`pio device monitor`, 115200):
+
+```
+G 0                          → drives to closed_pulse_us
+G 30                         → the other end of the calibration
+R                            → release; the servo goes slack
+```
+
+Or skip the keyboard entirely and sweep the knob — it commands the same axis at
+the same slew rate, which is usually the faster way to find where the mechanism
+binds. The onboard LED is solid while the jaws hold and blinks while they move.
+
+1. **Find the closed end.** Command `G 0` and watch. If the pads stop short
+   of touching, lower `closed_pulse_us` by ~50 µs and reflash; repeat until they
+   just meet with no buzz. If the servo grinds, the mechanism visibly strains,
+   or the supply's current climbs toward its limit, go back up 50 µs — that is a
+   stall, not a grip.
+2. **Find the open end.** Command `G <max_opening_mm>` and push
+   `open_pulse_us` the same way in ~50 µs steps until the jaws reach their widest
+   comfortable opening, again stopping before anything binds.
+3. **Measure the stroke.** With the servo holding the open end, measure the
+   actual pad-face-to-pad-face gap with calipers and put that number in
+   `max_opening_mm`. Every `GRIP` distance is scaled from it.
+4. **Check the middle.** Command a few intermediate openings and measure them.
+   They should track within a millimetre or so; if they bow consistently, the
+   linkage isn't linear over that range and the honest fix is to narrow the
+   calibration to the range where it is.
+5. **Set the boot opening** to wherever you intend to leave the jaws parked, and
+   reflash a last time.
+
+Once the calibration is settled and both boards are wired together, the bundled
+script exercises the same openings through the ESP32 and so proves the relay
+link end to end:
+
+```bash
+python python/run_script.py --port COM5 python/examples/gripper_checkout.txt
+```
+
+Keep the Uno's console open while it runs — every command the ESP32 relays is
+echoed there, and that echo is the only confirmation the link is alive.
+
+Three things the firmware cannot do for you: it never knows whether the jaws
+actually reached the opening it commanded (there is no feedback of any kind), it
+cannot tell whether the gripper node is even powered (the link is one-way), and
+it does not tell the torque governor that you are now carrying something — send
+`PAYLOAD <grams>` yourself after a grasp.
+
 ### Command reference
 
-| Command | Arguments | Effect |
-|---|---|---|
-| `PING` | — | liveness check, returns firmware name/version |
-| `STATE` | — | current mode, pose, homed/enabled flags |
-| `ENABLE` / `DISABLE` | — | energize / de-energize drivers. **DISABLE drops the homed flag** (unpowered steppers slip under gravity) — re-`SETHOME` after |
-| `SETHOME` | θ₁ θ₂ θ₃ (deg) | set the datum — declare the arm's current pose as home. The datum method for this build |
-| `HOME` | — | switch-seek homing (needs limit switches — **not fitted on this arm**; use `SETHOME`) |
-| `MOVEJ` | θ₁ θ₂ θ₃ (deg) | joint-space move |
-| `MOVEL` | x y z (mm) | straight-line Cartesian move via analytic IK |
-| `STOP` | — | immediate halt; clears FAULT |
-| `PAYLOAD` | grams | tell the torque governor what the gripper is holding |
-| `TELEM` | Hz (0 = off) | telemetry stream rate |
+| Command                  | Arguments            | Effect                                                                                                                                |
+| ------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `PING`                 | —                   | liveness check, returns firmware name/version                                                                                         |
+| `STATE`                | —                   | current mode, pose, homed/enabled flags                                                                                               |
+| `ENABLE` / `DISABLE` | —                   | energize / de-energize drivers.**DISABLE drops the homed flag** (unpowered steppers slip under gravity) — re-`SETHOME` after |
+| `SETHOME`              | θ₁ θ₂ θ₃ (deg) | set the datum — declare the arm's current pose as home. The datum method for this build                                              |
+| `HOME`                 | —                   | switch-seek homing (needs limit switches —**not fitted on this arm**; use `SETHOME`)                                         |
+| `MOVEJ`                | θ₁ θ₂ θ₃ (deg) | joint-space move                                                                                                                      |
+| `MOVEL`                | x y z (mm)           | straight-line Cartesian move via analytic IK                                                                                          |
+| `GRIP`                 | opening mm           | jaw opening, pad face to pad face. Relayed to the gripper node; slews at`speed_mm_s`; `EV GRIP_DONE` when it lands. Needs `ENABLE`, not a datum |
+| `STOP`                 | —                   | immediate halt; clears FAULT                                                                                                          |
+| `PAYLOAD`              | grams                | tell the torque governor what the gripper is holding                                                                                  |
+| `TELEM`                | Hz (0 = off)         | telemetry stream rate                                                                                                                 |
+
+### Running a script of commands
+
+To play back a saved sequence instead of typing commands one at a time, use the
+host runner. It reads a `.txt` file of the commands above (one per line; `#`
+comments and blank lines ignored; `SLEEP <s>` pauses the host), sends each and
+waits for it to finish before the next:
+
+```bash
+python python/run_script.py --port COM5 python/examples/demo_moves.txt
+```
+
+Its one added behavior: a `MOVEJ` that moves **more than one joint is executed
+one joint at a time** (holding the others at their current angle), so the shared
+breadboard motor rail only ever powers one moving coil — the fix for the supply
+sag when all three drive together. Pass `--no-split` to send coordinated moves
+instead. `--dry-run --start θ₁,θ₂,θ₃` previews the exact wire lines (including
+the per-joint split) with no hardware attached. `MOVEL` can't be split
+host-side (it resolves to a pose on-chip via IK) and is sent whole. Live runs
+need `pip install pyserial`.
 
 ## Troubleshooting
 
-| Symptom | Likely cause |
-|---|---|
-| Motor whines/holds but won't step | STEP/DIR swapped, or STEP pin miswired |
-| Moves land at exactly ½ / 2× / 4× the commanded angle | the UART config never reached that driver (PDN bus wiring, wrong address strap) so it's running its pin-strap default resolution |
-| One motor weak/silent while others behave; or two joints act identically | duplicate or wrong MS1/MS2 address straps — each driver needs a unique address (base 0, shoulder 1, elbow 2) |
-| Joint moves the wrong direction | flip that joint's `invert_dir` in `firmware.yaml` and reflash |
-| `ERR NOT_HOMED` on every move | run `SETHOME` first; also re-`SETHOME` after any `DISABLE` |
-| Datum drifts / moves land off by a constant offset | reference-pose placement was inaccurate — re-place the arm and `SETHOME` again (a jig helps) |
-| Motors stutter or drivers reset under load | missing VM capacitor, undersized PSU, or missing common ground |
-| Skipped steps on fast moves | `irun` too low, or `motor.holding_torque_nm` in `robot.yaml` optimistic — the governor can only respect the torque it's told about |
-| ESP32 resets when motors enable | motor PSU current sagging into the USB ground path — check grounding and PSU capacity |
+| Symptom                                                                  | Likely cause                                                                                                                              |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Motor whines/holds but won't step                                        | STEP/DIR swapped, or STEP pin miswired                                                                                                    |
+| Moves land at exactly ½ / 2× / 4× the commanded angle                 | the UART config never reached that driver (PDN bus wiring, wrong address strap) so it's running its pin-strap default resolution          |
+| One motor weak/silent while others behave; or two joints act identically | duplicate or wrong MS1/MS2 address straps — each driver needs a unique address (base 0, shoulder 1, elbow 2)                             |
+| Joint moves the wrong direction                                          | flip that joint's`invert_dir` in `firmware.yaml` and reflash                                                                          |
+| `ERR NOT_HOMED` on every move                                          | run`SETHOME` first; also re-`SETHOME` after any `DISABLE`                                                                           |
+| Datum drifts / moves land off by a constant offset                       | reference-pose placement was inaccurate — re-place the arm and`SETHOME` again (a jig helps)                                            |
+| Motors stutter or drivers reset under load                               | missing VM capacitor, undersized PSU, or missing common ground                                                                            |
+| Skipped steps on fast moves                                              | `irun` too low, or `motor.holding_torque_nm` in `robot.yaml` optimistic — the governor can only respect the torque it's told about |
+| ESP32 resets when motors enable                                          | motor PSU current sagging into the USB ground path — check grounding and PSU capacity                                                    |
+| Jaws jump the moment you send`ENABLE`                                  | the servo is snapping to`gripper.boot_opening_mm` — park the jaws there before power-up, or correct the value and reflash             |
+| Servo buzzes hard, gets hot, or grinds at one end of the stroke           | it is stalled against a mechanical stop — pull`closed_pulse_us`/`open_pulse_us` back toward the middle by ~50 µs and reflash        |
+| `GRIP 20` doesn't give 20 mm at the pads                               | calibration:`max_opening_mm` must be the gap you actually measure at `open_pulse_us`                                                  |
+| Jaws creep open while holding a part                                     | the mechanism is not self-locking and the servo let go — set`release_after_s: 0` (the default) so the PWM never stops                 |
+| Jaws don't move at all,`ERR DISABLED` on GRIP                          | commands are only relayed after`ENABLE`                                                                                                 |
+| `GRIP` returns`OK` but nothing moves                                   | the link is one-way, so the ESP32 cannot detect a dead node. Check the Uno's console for the echo, then its power, then the GPIO 13 → D2 wire and the shared ground |
+| Uno console shows garbled characters after`ERR BADCMD`                 | the 3.3 V relay signal has only 0.3 V of margin at the Uno's input — drop`relay_baud` to 9600 and reflash both boards                  |
+| Jaws move on their own during a script                                   | the manual knob took over — it reclaims control whenever it moves past its deadband. Leave it alone, or send another`GRIP` to take control back |
+| Bench supply hits its current limit during calibration                   | the servo is stalled against a stop; narrow`closed_pulse_us`/`open_pulse_us` rather than raising the limit                             |

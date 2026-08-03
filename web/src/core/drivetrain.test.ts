@@ -111,7 +111,7 @@ describe('gravity torques', () => {
     upperArm: 0.16,
     forearm: 0.12,
     elbowMotor: 0.35,
-    gripper: 0.09,
+    gripper: 0.06,
     payloadDefault: 0.1,
     payloadMax: 0.5,
   };
@@ -119,8 +119,8 @@ describe('gravity torques', () => {
   it('worst case at full horizontal extension', () => {
     const [tb, ts, te] = gravityTorques([0, 0, 0], geom, masses, 0.1);
     expect(tb).toBe(0);
-    expect(ts).toBeCloseTo(1.166, 2); // hand-computed in docs/linkage-geometry.md
-    expect(te).toBeCloseTo(0.294, 2);
+    expect(ts).toBeCloseTo(1.095, 2); // hand-computed in docs/linkage-geometry.md
+    expect(te).toBeCloseTo(0.259, 2);
   });
 
   it('vanishes with the arm vertical', () => {

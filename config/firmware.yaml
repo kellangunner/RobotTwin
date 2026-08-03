@@ -42,9 +42,66 @@ tmc_uart:
   enabled: true
   tx_pin: 26
   baud: 115200
-  irun: 16                   # run current scale 0..31 (31 = full scale);
-                             # ~0.9-1.0 A RMS with typical 110 mOhm sense
-  ihold: 8                   # standstill current scale 0..31
+  # ~0.9-1.0 A RMS with typical 110 mOhm sense. Dropping to 12 to chase rail
+  # sag cost ~25% torque and left the shoulder at only x1.6 gravity margin --
+  # it clicked (skipped poles) trying to lift. Torque is the binding constraint
+  # here, not current draw, so this stays at 16.
+  irun: 16                   # run current scale 0..31 (31 = full scale)
+  # Standstill current. At 8 the shoulder held only ~1.0x its own gravity
+  # torque through the 15:1 and backdrove ("flopped") the moment a move ended
+  # and current dropped from irun. 14 restores ~1.8x. NOTE: ihold is drawn
+  # CONTINUOUSLY while enabled -- this exceeds the breadboard's comfortable
+  # budget, so DISABLE between tests and touch-check the drivers for heat
+  # until the motor supply moves to soldered joints or screw terminals.
+  # Held at parity with irun so the shoulder holds the pose it just moved to --
+  # at 8 it backdrove ("flopped") the instant a move ended and current dropped.
+  ihold: 16                  # standstill current scale 0..31
+
+# Gripper axis — the SG-90 hobby servo driving the parallel-jaw mechanism at
+# the forearm tip. Nothing like the three joints: no driver, no step/dir, no
+# homing, no torque governor. One 50 Hz PWM channel whose pulse width sets the
+# jaw opening, and the two calibration pulses below ARE the entire model —
+# opening is assumed linear between them, which is what a rack-and-pinion (or
+# the equivalent geared parallel linkage) gives over its usable swing.
+#
+# THE SERVO DOES NOT RUN ON THE ESP32. An Arduino Uno drives it from its own
+# 5 V bench supply, so a ~650 mA stall transient cannot brown out the board that
+# is generating step pulses, and the servo sees proper 5 V logic instead of the
+# ESP32's marginal 3.3 V. The ESP32 only relays "G <mm>" over a one-way serial
+# link. Both boards read this same block: the ESP32 through the usual embedded
+# YAML, the Uno through arduino/gripper_node/scripts/gen_gripper_config.py.
+# That is why pin numbers for two different boards live side by side below.
+#
+# CALIBRATE BEFORE TRUSTING THESE NUMBERS. The pulse span starts deliberately
+# narrow so a first power-on cannot drive the mechanism into its hard stops and
+# stall the servo (a stalled SG-90 draws ~650 mA and cooks its gears). Widen
+# closed/open a little at a time with GRIP while watching the jaws, then set
+# max_opening_mm to the opening you actually measure at open_pulse_us.
+# See docs/wiring-and-bringup.md "Gripper calibration".
+gripper:
+  pin: 9                     # ARDUINO pin carrying the servo signal — D9, one
+                             # of the two pins the Servo library's timer owns
+  relay_pin: 13              # ESP32 GPIO, UART2 TX → Uno D2 (1 kΩ in series).
+                             # Same pin that used to carry PWM directly.
+  relay_rx_pin: 2            # ARDUINO pin receiving that link — D2. It cannot
+                             # be D0: the Uno's hardware UART is wired to its USB
+                             # chip, so the relay must use SoftwareSerial or it
+                             # fights the console and sketch uploads.
+  relay_baud: 19200          # the Uno receives this on SoftwareSerial, which is
+                             # not reliable much above this; drop to 9600 if the
+                             # link garbles bytes
+  knob_pin: 14               # ARDUINO analog pin for the manual opening knob —
+                             # A0, which the AVR core numbers 14
+  pwm_hz: 50                 # standard hobby-servo frame rate
+  closed_pulse_us: 1200      # jaws shut  (opening = 0 mm)      — conservative
+  open_pulse_us: 1800        # jaws at max_opening_mm           — conservative
+  max_opening_mm: 30.0       # pad face to pad face at open_pulse_us — MEASURE
+  speed_mm_s: 40.0           # commanded jaw slew; the servo's own speed caps it
+  boot_opening_mm: 30.0      # where the jaws are assumed to sit at power-on
+  # Seconds of stillness before the PWM stops, to silence the servo's holding
+  # buzz. 0 = drive forever. The mechanism is NOT self-locking: releasing while
+  # gripping drops the part, so leave this at 0 unless the jaws are empty.
+  release_after_s: 0
 
 # Homing runs joint-by-joint in this order. Elbow first assumes the arm is
 # racked roughly upright at power-on; revisit during bring-up.
@@ -80,6 +137,13 @@ joints:
   elbow:
     step_pin: 21
     dir_pin: 22
+    # Was briefly true -- that inverted the whole elbow axis. invert_dir only
+    # flips the DIR pin (step_engine.cpp), NOT the step counter, so the firmware
+    # still believed it was tracking toward the commanded angle while the shaft
+    # turned the other way. Off the 0/90/-90 datum, "open the elbow to 0" (a
+    # +90 move) drove -90 instead and headed for -180, folding the forearm back
+    # into the column until the -150 limit caught it. With false, theta3 = 0 is
+    # the straight, fully extended arm the kinematics and CAD both assume.
     invert_dir: false
     uart_address: 2
     limit:

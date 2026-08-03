@@ -20,6 +20,7 @@ idf_component_register(
     ${RT_ROOT}/src/config/load.cpp
     ${RT_ROOT}/src/hardware/hardware_config.cpp
     ${RT_ROOT}/src/hardware/serial_protocol.cpp
+    ${RT_ROOT}/src/hardware/gripper.cpp
   INCLUDE_DIRS ${RT_ROOT}/src
 )
 

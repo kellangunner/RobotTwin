@@ -1,12 +1,21 @@
-# Cycloidal gearboxes — 15:1 and 20:1 (v2, face-mounted)
+# Cycloidal gearboxes — 15:1 and 20:1 (v3 pinned casing, v5 live-shaft output)
 
 Single-stage cycloidal reducers for the pitch joints (shoulder, elbow): a
-**Ø62 × 38.4 mm cartridge with a Ø76 × 4 front flange** that bolts
-face-first onto the linkage's drive-side ear disc (6 × M3 into its heat-set
-inserts on a **Ø66 bolt circle**), carries the NEMA 17 on its own back
-plate, and drives the **8 mm joint shaft** running in the clevis ears' 608-2RS
-bearings. Both ratios share every dimension except the disc lobe count and
-cam eccentricity, so the twin's gearbox trade study
+**plain Ø76 × 36 mm casing in two flat printed halves** — a *cup* (motor
+plate + outer wall) and a *lid* (the mounting flange) — **held together and
+registered by the Ø6 × 25 steel ring dowels themselves**, which run through
+the entire cup and seat in blind holes in the lid. Six M3 × 40 screws from
+the gearbox back clamp cup + lid + linkage ear in one stack: they are the
+case closure *and* the mounting. The lid face bolts to the linkage's
+drive-side ear disc (Ø76, 6 × M3 heat-set inserts on a **Ø66 bolt
+circle**). Since the live-shaft rev (v5) the 8 mm joint shaft IS the torque
+path: past the lid face the output's Ø22 hub becomes the **shaft-clamp
+extension** — a Ø25.05 seat carrying the drive ear's **6805** support
+bearing, then a Ø24.6 **split pinch** that clamps the smooth shaft, whose
+other end the arm hub grabs with its own pinch. Only the OUTPUT changed for
+v5: **cup, lid, discs, cam, and pins are identical to the dead-axle prints —
+do not reprint them.** Both ratios share every dimension except the disc
+lobe count and cam eccentricity, so the twin's gearbox trade study
 (`gearboxes.shoulder.ratio` in [config/robot.yaml](../../config/robot.yaml))
 maps 1:1 onto hardware swaps.
 
@@ -16,21 +25,23 @@ maps 1:1 onto hardware swaps.
 the validator (`python/validate_cycloid.py`) both parse it — edit the yaml,
 re-run both, never edit constants in the scripts.
 
-**Status: preliminary.** Geometry is validated analytically (34 derived
-clearance checks per ratio) and numerically (undercut, torque budget: all
-PASS) but nothing has been printed. The v1 drum-cartridge parts are kept in
-[archive/](archive/).
+## Why v3 (the v2 print failed)
 
-## What changed from v1 (archive/)
+v2's monolithic housing was clever and unprintable-in-practice: necked
+body, groove-wrapped pins, a pinch clamp fed through a wall tunnel — and
+the discs jammed ("too large") because the 0.15 mm profile clearance
+vanished under real FDM tolerances. v3 is the simple version:
 
-| | v1 (drum cartridge) | v2 (face-mounted) |
+| | v2 (monolith) | v3 (pinned sandwich) |
 |---|---|---|
-| Mounting | slipped into a Ø68 drum, friction-clamped by the 4 NEMA screws | Ø76 flange, 6 × M3 into ear-disc inserts on the Ø66 BCD — bolts react ring torque positively |
-| Output pins | printed Ø6, unproven across layer lines | **Ø6 × 25 steel dowels**, pressed 11.7 mm into the flange |
-| Ring pins | printed Ø4, integral with the housing | **Ø6 × 25 steel dowels** (same stock) in wrap-around wall grooves, pressed into the back plate; ring circle grew to R 28 to make room |
-| Shaft coupling | 2 grub screws in printed threads (flagged weak) | split pinch clamp: tangential M3 + captured nut, 10.4 mm engagement in a Ø8.2 bore |
-| Envelope | Ø66 × 24 | Ø62 × 38.4 + Ø76 × 4 flange (the 25 mm pins set the length) |
-| Motor | outboard of the drum wall | directly on the housing back plate (pilot recess, M3 × 8 from inside) |
+| Casing | one Ø62/Ø59 necked body, hairline OD slits | two flat Ø76 halves, no supports-critical features |
+| Ring dowels | grooves wrapped past the pin equator | free-standing, **through the cup + 6.5 mm into the lid**, double shear, fully captive |
+| Case closure | — (monolith) | the ring dowels register the halves; the 6 mount screws clamp them |
+| Mount screws | M3 × 10 at the flange, hex key threaded past the body | M3 × 40 through-bolts from the back — nothing to sneak past |
+| Disc-to-box fit | 0.9 mm to a grooved ring bore | **4.4 mm to a plain Ø62.5 interior** — the box cannot bind the disc |
+| Profile clearance | 0.15 mm (jammed as printed) | **0.25 mm, yaml-tunable**, plus a numeric assembled-mesh sweep in the validator |
+| Shaft coupling | split pinch + captured nut + access tunnel | **drive sleeve**: the output's flats plug straight into the arm hub — the shaft is a static, torque-free axle (no flat, no grub screw, no pinch) |
+| Parts per gearbox | 4 printed | 5 printed, every one trivial to print |
 
 ## How it works
 
@@ -40,17 +51,23 @@ Fixed-ring, rotating-output cycloidal drive. Ratio = Zc (lobes), reversing:
    Ø15 journals offset ±e, 180° apart, each carrying a **6802-2RS** bearing.
 2. Two identical **cycloid discs** (`rt_cyc*_disc`, clocked half a lobe
    apart) wobble on the bearings; their lobes walk around **Zp = Zc + 1
-   Ø6 × 25 steel dowel pins** seated in the stationary **housing**
-   (`rt_cyc*_housing`): each pin is pressed into a blind hole in the back
-   plate and wrapped past its equator by a full-length wall groove, so mesh
-   load pushes it into the wrap. The pin pattern is clocked (11.25° / 0°) so
-   the press holes clear the NEMA screw counterbores.
+   Ø6 × 25 steel dowel pins** standing free between the casing halves —
+   pressed through the cup's bottom (flush at the back face), located in
+   the lid's blind holes, loaded in double shear. The pin pattern is
+   clocked (11.25° / 0°) so the cup's press holes clear the NEMA screws.
 3. Per cam revolution each disc creeps back one lobe pitch: rotation −1/Zc.
-   Six **Ø6 × 25 steel dowel pins** through oversized disc holes
-   (Ø = pin + 2e + 0.3) pass that slow rotation to the **output flange**
-   (`rt_cyc*_output`), whose hub pinch-clamps the 8 mm joint shaft and whose
-   Ø13 boss bears on the inboard 608 inner race, replacing the inboard shaft
-   collar (the outboard set-screw collar stays on the far ear).
+   Six more **Ø6 × 25 dowels** pressed 11.7 mm into the **output flange**
+   (`rt_cyc*_output`) ride in oversized disc holes (Ø = pin + 2e + 0.3) and
+   carry the slow rotation out. The flange's Ø22 hub passes out through
+   the lid's Ø25.85 face bore — sized so the **whole extension assembles
+   through it** — and continues past the lid face as the **shaft-clamp
+   extension**: first a Ø25.05 seat that rides the **6805 bearing housed
+   in the drive ear** (this carries the joint's −Y structural load), then
+   a Ø24.6 body ending in a **split pinch** — slit open at the tip, one
+   M3 cross-bolt with a captured nut — that clamps the live 8 mm shaft.
+   The shaft slips ~19.5 mm into the extension's Ø8.35 bore; torque goes
+   output → pinch → shaft → the arm hub's own pinch. The drive-ear 6805,
+   not the lid, locates the output radially.
 
 Two discs on opposite eccentrics balance the wobbling mass and split the
 tooth load; the disc profile is the exact conjugate envelope of the pin set
@@ -58,20 +75,32 @@ tooth load; the disc profile is the exact conjugate envelope of the pin set
 
 ## Parameters
 
-Shared: pin circle R = 28 (Ø6 ring pins need the extra millimetre to keep
-the disc output-hole walls printable), every pin a Ø6 × 25 steel dowel, disc
-thickness 6, disc bore Ø24.2 (6802 OD + 0.2), output pins on a Ø36 BCD
-(press-fit Ø5.9 holes), profile print clearance 0.15 mm radial, body Ø62
-necking to a Ø59 collar (socket heads and a 2.5 mm hex key clear the Ø66
-bolt circle axially), ring bore per ratio ≈ Ø55.
+Shared: pin circle R = 28, every pin a Ø6 × 25 steel dowel, disc thickness
+6, disc bore Ø24.2 (6802 OD + 0.2), output pins on a Ø36 BCD, profile print
+clearance 0.25 mm radial (yaml: `profile_print_clearance` — tune on a test
+disc), casing Ø76 with a Ø62.5 interior.
+
+**Steel-pin hole fits are printer-specific — calibrate them.** FDM prints
+holes undersize, by an amount that depends on your machine, material, speed,
+and cooling, so the pin-hole diameters are modeled *over* nominal to
+compensate and are yaml parameters, not fixed numbers
+(`external_pin_hole_clearance`, `output_pin_hole_clearance`,
+`ring_pin_lid_clearance`, all diametral, added to Ø6). The defaults aim for
+a *slip/light* fit retained with adhesive — the most repeatable result
+across printers — not a bare interference press, which is what jammed on the
+first attempt. The cam's D-bore on the motor's 5 mm shaft is the same story
+and is yaml too (`motor_bore_clearance`, `motor_flat_clearance`) — the Ø5.2
+first print needed a hammer. See the calibration step under Printing before
+committing a full set of dowels.
 
 | | 15:1 | 20:1 |
 |---|---|---|
 | Disc lobes Zc / ring pins Zp | 15 / 16 | 20 / 21 |
 | Eccentricity e | 1.0 mm | 0.8 mm |
 | Trochoid coefficient λ = e·Zp/R | 0.57 | 0.60 |
-| Disc root / tip radius | 23.9 / 25.9 | 24.1 / 25.7 |
-| Min convex profile curvature (vs Ø6.3 cutter) | 6.6 mm ✓ | 5.0 mm ✓ |
+| Disc root / tip radius | 23.75 / 25.75 | 23.95 / 25.55 |
+| Min convex profile curvature (vs Ø6.5 cutter) | 6.6 mm ✓ | 5.0 mm ✓ |
+| Assembled mesh clearance (full cam sweep) | 0.25 mm ✓ | 0.25 mm ✓ |
 | Radial mesh engagement 2e | 2.0 mm | 1.6 mm |
 | Disc output holes (6×) | Ø8.30 | Ø7.90 |
 | Output torque @ 0.45 Nm × η 0.60 | **4.05 Nm** | **5.40 Nm** |
@@ -86,95 +115,138 @@ reach — that corner of the envelope stays governed by the twin's torque
 governor, exactly the trade the digital twin exists to explore. 20:1 gets
 within 4 % of it.
 
-## Axial stack (z from the motor face, 38.4 mm to the mounting plane)
+## Axial stack (z from the cup's back face, 36 mm to the mounting plane)
 
 ```
-z  0.0 -  5.0   back plate: Ø22.5 pilot recess (2.2 deep), Ø14 shaft bore,
+z  0.0 -  5.0   cup bottom: Ø22.5 pilot recess (2.2 deep), Ø14 shaft bore,
                 4x M3 counterbored from inside (heads z 1.5..4.5),
-                Zp x Ø5.9 blind press holes (z 0.5..5) for the ring dowels
-z  0.5 - 25.5   Ø6 x 25 steel ring dowels in full-length wall grooves
-z  5.0 - 18.5   grooved ring wall (bore ~Ø55; grooves run to the front face)
+                Zp x Ø6.1 ring-dowel holes, back-chamfered (flush at z 0)
+z  0.0 - 25.0   Ø6 x 25 steel ring dowels: through the cup, 6.5 mm into
+                the lid's blind holes — they pin the casing together
+z  5.0 - 18.5   cup wall, plain Ø62.5 bore (disc reach Ø53.7: 4.4 mm air)
 z  5.5 - 11.5   disc A on cam journal +e (bearing 6802)
 z 12.0 - 18.0   disc B on cam journal -e, clocked half a lobe
 z  5.7 - 30.7   Ø6 x 25 steel output pins (blind holes end z 30.9)
+z 18.5 - 36.0   lid: bore Ø48 to z 31.9 (flange plate spins inside),
+                then Ø25.85 face bore (the extension assembles through
+                it); face flush on the ear disc
 z 19.0 - 31.4   output flange plate Ø46 (motor-shaft pocket to z 26 inside)
-z 31.4 - 37.9   output hub Ø22: pinch slit, tangential M3 at z 34.7,
-                blind Ø8.2 shaft bore, floor z 28 = shaft depth stop
-z 34.4 - 38.4   Ø76 flange ring (6x Ø3.2 on the Ø66 BCD, snug on M3)
-z 37.9 - 38.4   Ø13 boss - bears on the inboard 608 inner race
+z 28.0 - 57.75  shaft bore Ø8.35: slip fit, closed onto the shaft by the pinch
+z 31.4 - 36.0   output hub Ø22: spins free inside the lid face bore to z 36
+z 36.0 - 43.0   Ø25.05 seat: the drive ear's 6805 rides here (pocket depth 7)
+z 43.0 - 57.75  Ø24.6 extension body through the ear's Ø27 shoulder, ending
+                in the SPLIT PINCH (z 48.75-57.75: slit open at the tip,
+                M3 cross-bolt at z 53.25, captured nut) that clamps the
+                shaft in the open gap before the arm hub (face at z 58.5)
 ```
 
 The motor's shaft (max 25 mm) ends inside the flange plate's Ø8.6 pocket
-(ceiling z 26); the output bore floor at z 28 is the joint shaft's depth
-stop, keeping the two shafts 2 mm apart tip-to-tip. A Ø6.5 tunnel through
-the collar/flange wall at z 34.7 admits the pinch bolt and its driver.
+(ceiling z 26); the live joint shaft enters from the far ear through that
+ear's 608 and the arm hub's pinch bore, and its tip stops at z 38.25 —
+2.25 mm shy of the lid face, ~19.5 mm deep in the extension bore, fully
+covering the pinch. The existing 68 mm shafts are reused unmodified.
 
 ## Assembly
 
-1. M3 × 8 from inside the empty housing into the motor's threads (pilot boss
-   in the recess). Slide the cam onto the D-shaft; the 6802s press onto its
+1. M3 × 8 from inside the empty cup into the motor's threads (pilot boss in
+   the recess). Slide the cam onto the D-shaft; the 6802s press onto its
    journals.
-2. Drop a Ø6 × 25 dowel down each wall groove and press it home into its
-   blind plate hole with a Ø5 drift (seated = flush with the groove bottom,
-   4.5 mm engaged). The grooves wrap the pins past their equators; the ear
-   disc face caps the grooves once the cartridge is mounted.
-3. Disc A over bearing A, disc B over B — the output-hole pattern self-jigs
+2. Disc A over bearing A, disc B over B — the output-hole pattern self-jigs
    the half-lobe clocking.
-4. Press the six remaining dowels into the output flange's blind holes;
-   slide the pin cage through both discs. Slip the M3 nut into the hub's
-   side window and feed the pinch bolt through the access tunnel a few
-   threads.
-5. Bolt the cartridge to the ear disc: 6 × M3 × 10 through the Ø3.2 flange
-   holes into the heat-set inserts (snug holes center the housing).
-6. Slide the 8 mm shaft in from the far ear, through the driven hub and
-   bearings, into the output bore until it seats at the floor. Rotate the
-   output until the pinch bolt lines up with the tunnel and tighten. Fit the
-   outboard shaft collar per the linkage README.
+3. Seat the Zp ring dowels in the cup holes until flush at the back (a dab
+   of adhesive per the calibration note unless you dialled in a true press);
+   they thread through the meshed disc valleys — wiggle the discs if one
+   hangs. The back chamfer starts them straight.
+4. Seat the six output dowels in the flange's blind holes (same fit); feed
+   the pin cage through both discs.
+5. Lower the lid over the extension and onto the dowel tips (the blind
+   holes are the jig). The cartridge is now complete but unclamped.
+6. Press the 608 into the +Y ear and the 6805 into the drive ear's
+   outboard pocket. Set the arm between the ears and slide the 8 mm shaft
+   in from the +Y side, through the ear 608 and the hub's pinch bore
+   (pinch loose), until ~10 mm protrudes on the −Y side.
+7. Offer the cartridge up to the drive ear: the extension tip (Ø24.6)
+   passes through the 6805, its Ø25.05 seat presses lightly into the
+   bearing bore, and the Ø8.35 bore swallows the shaft end. Run the six
+   M3 × 40 from the gearbox back through everything into the ear-disc
+   inserts (snug Ø3.2 holes center the casing). Tighten the OUTPUT pinch
+   bolt in the ear-to-hub gap, then the arm hub's two pinch bolts, then
+   fit the +Y collar 0.5 mm off the ear face. Degrease the shaft first —
+   both couplings are friction clamps.
 
 ## Printing (Bambu A1 Mini, PETG, ≥4 perimeters, 50 %+ infill)
 
-- Housing: back plate down, grooves vertical. Supports under the Ø76 flange
-  ring (8.5 mm annular overhang at z 34.4); the small internal ledge at
-  z 18.5 bridges fine. The pin grooves open as hairline slits on the body
-  OD (the Ø66 bolt circle leaves no room to close them) — they print as
-  seams and are cosmetic only.
-- Discs: flat, no supports. The profile already carries 0.15 mm clearance —
-  print a test disc and check it drops over the pins with light lobe contact.
+**Calibrate the dowel holes first.** Print a scrap coupon with a row of
+holes at Ø6.0, 6.1, 6.2, 6.3, 6.4 and try a real dowel in each. Pick the
+smallest that accepts the pin with firm hand/light-tap pressure (no
+splitting) — that diameter minus 6.0 is your `*_hole_clearance` value; set
+the three yaml keys and re-run the generator. The stock values are
+print-verified on an A1 Mini: cup and lid press perfectly at +0.10
+(bed-face holes shrink only ~0.1 mm); the flange runs +0.15 because its
++0.05 first print was too tight to seat. Note the cam's vertical D-bore
+shrinks much more than these bed-face holes — its fit is separate
+(`motor_bore_clearance`). If you raise the cup value, the NEMA counterbore
+clearance check caps it ≈ +0.27 on the 21-pin ring. If you land on a slip fit, that is fine — a drop of
+cyanoacrylate or retaining compound in each hole holds the pin far more
+repeatably than a bare press, and the ring pins are captive in the sandwich
+regardless. The holes carry a back-face (printed-bottom) chamfer to swallow
+the elephant's-foot lip and start the pin straight.
+
+- Cup: back face down, wall up — no supports.
+- Lid: mounting face down — the internal Ø25.85→Ø48 step is an annular bridge
+  ~4.6 mm up; enable supports for it or accept the bridge (it's a
+  non-bearing ceiling).
+- Discs: flat, no supports. Print ONE first and confirm it drops over the
+  assembled pins and rocks freely — the 0.25 mm profile clearance is
+  yaml-tunable if your printer runs tight or loose.
 - Cam: bore vertical, no supports. Journals sized Ø15.05 — sand to a light
-  press on the 6802s.
-- Output flange: plate face down (pin holes open at the bed), hub up, no
-  supports. Ream the Ø5.9 holes gently if the dowels won't start.
+  press on the 6802s. The D-bore is modeled Ø5.35 with the flat 0.2 proud
+  (`motor_bore_clearance` / `motor_flat_clearance`) so it *slides* onto the
+  motor shaft — the flat drives, the bore only locates.
+- Output flange: plate face down (pin holes open at the bed), sleeve up, no
+  supports — the pin holes print at their calibrated Ø with the lead-in
+  chamfer at the bed, the drive flats print as clean vertical walls, and
+  the Ø2.5 lock pilot is a short horizontal hole that needs no support.
 
 ## Purchased hardware (per gearbox)
 
 | Item | Qty | Where |
 |---|---|---|
-| Ø6 × 25 mm steel dowel pin | 6 + Zp (22 / 27) | 6 output drive pins in the flange + Zp ring pins in the housing |
+| Ø6 × 25 mm steel dowel pin | Zp + 6 (22 / 27) | Zp casing/ring pins + 6 output drive pins |
 | 6802-2RS bearing (15 × 24 × 5) | 2 | eccentric cam journals |
-| M3 × 8, socket head | 4 | housing → motor threads (heads inside) |
-| M3 × 10, socket head | 6 | flange → ear-disc heat-set inserts |
-| M3 × 12 + nut | 1 | output hub pinch clamp |
+| M3 × 8, socket head | 4 | cup → motor threads (heads inside) |
+| M3 × 40, socket head | 6 | through the casing → ear-disc heat-set inserts |
 
-(The 608s, 8 mm shaft, outboard collar, and the heat-set inserts belong to
-the joint/linkage BOM. The inboard collar is replaced by the output hub's
-boss.)
+(The 608s, 8 mm axle, outboard collar, and the heat-set inserts belong to
+the joint/linkage BOM. The axle is static and torque-free: cut to length,
+no ground flat, no grub screw — the drive sleeve couples the output
+straight to the arm hub.)
 
 ## Open issues (before printing structural versions)
 
-1. **Pinch-clamp torque is unproven.** A single M3 closing a Ø8.2 printed
-   bore on the plain 8 mm shaft must carry up to 5.4 Nm; if it slips, grind
-   a flat on the shaft where the clamp lands (the positive-drive fallback).
-2. **Backlash isn't zero.** The 0.15 mm profile clearance + 0.3 mm output
-   hole clearance ≈ 0.2–0.5° lost motion at the output; the twin currently
+1. **Pinch-on-smooth-shaft torque path is unproven — and it is a friction
+   joint, not a form lock.** The 20:1 output can deliver 5.4 Nm; a PETG
+   split pinch plus a press bore on polished hardened rod plausibly holds
+   a few Nm when fresh and loses preload to plastic creep over time.
+   Mitigations, in order: degrease the shaft; torque the pinch bolts
+   firmly and re-check after the first sessions; retaining compound
+   (Loctite 638) in both bores; and the firmware's torque governor
+   (`safety.torque_ceiling`) keeping commanded torque below the static
+   ceiling. If slip shows up under direction reversals anyway, the
+   fallback is grinding a small flat on each shaft end and reprinting the
+   two clamp parts with D-bores — the geometry accepts that without
+   moving any other dimension.
+2. **Backlash isn't zero.** The 0.25 mm profile clearance + 0.3 mm output
+   hole clearance ≈ 0.3–0.6° lost motion at the output; the twin currently
    models cycloidal backlash as 0. Measure on the printed unit and update
    `gearbox_models.cycloidal.backlash_deg`.
 3. **Efficiency is a guess.** η = 0.60 comes from the config's printed-drive
    assumption; validate with a torque test before trusting the margins.
-4. **Ring-dowel axial retention is press-fit only.** The insertion grooves
-   are open toward the front face (unavoidable in a one-piece housing), so
-   a pin that walks up rides in its groove; the ear disc caps total escape
-   and the wrap keeps it radially captive, but check seating after the
-   first runs — a dab of adhesive in the plate holes is cheap insurance.
+4. **Pin-hole fit is printer-specific.** The first print modeled the holes
+   *under* Ø6 for an interference press; combined with FDM's own hole
+   shrink the steel dowels would not enter. The holes are now modeled over
+   nominal and exposed as yaml parameters — calibrate them with a coupon
+   (see Printing) and prefer a slip fit + adhesive over a bare press.
 
 ## Regenerating
 
@@ -185,5 +257,7 @@ boss.)
   hobbing boolean pass takes a minute or two.
 - Dry run (no Fusion): `python engineering/fusion/cycloidal_gearbox/cycloidal_gearbox.py`
   prints the derived stack and all clearance checks.
-- Checks + profile SVGs: `python python/validate_cycloid.py` (imports the
-  generator, so it can never drift out of sync).
+- Mesh + profile checks: `python python/validate_cycloid.py` — imports the
+  generator (never drifts out of sync) and numerically sweeps the assembled
+  disc against the pins through a full cam revolution, so a jam like the
+  v2 print shows up here, not at the printer.

@@ -29,22 +29,74 @@
 # face-mounted cartridge). Every pin in the gearbox — ring and output — is
 # the same Ø6 x 25 steel dowel; nothing torque-bearing is printed as a pin.
 # The 608-2RS bearings, the 8 mm shaft, and its set-screw collars belong to
-# the linkage clevis (see the linkage BOM); the gearbox only meets them: the
-# output hub clamps the shaft and its boss bears on the inboard 608 inner race.
+# the linkage clevis (see the linkage BOM); the gearbox meets them at the
+# output's shaft-clamp extension (live-shaft v5 — see the keys below).
 hardware:
-  external_pin_length: 25.0    # ring dowels: pressed into the back plate,
-                               # wrapped by full-length wall grooves
-  external_pin_press_fit: 0.1  # diametral interference, plate blind holes
-  ring_groove_clearance: 0.15  # diametral, on the wall grooves
-  output_pin_length: 25.0      # Ø6 x 25 steel dowel pins, pressed into the flange
+  external_pin_length: 25.0    # ring dowels: through the whole cup (holes in
+                               # its bottom, flush at the back face) and 6.5 mm
+                               # into blind holes in the lid — they pin the two
+                               # casing halves in double shear
+  # Steel-dowel hole fits (diametral, ADDED to the nominal pin Ø). FDM prints
+  # holes UNDERSIZE, so these are modeled OVER nominal to compensate:
+  #   printed_hole ~= pin + this - (your printer's hole shrink, ~0.1..0.3)
+  # Positive default = a slip/light fit you retain with adhesive — reliable
+  # across printers. Lower toward 0 or negative for a true press ONLY after a
+  # calibration coupon (see README). Print-verified on the A1 Mini: cup and
+  # lid at +0.10 press perfectly (bed-face Ø6 holes shrink only ~0.1 mm
+  # there), while the flange's +0.05 was too tight to seat the dowels.
+  external_pin_hole_clearance: 0.10   # cup through-holes — print-verified fit,
+                                      # do not change (also capped ~0.27 by the
+                                      # NEMA counterbores on the 21-pin ring)
+  ring_pin_lid_clearance: 0.10        # lid blind locating holes — print-verified
+  output_pin_hole_clearance: 0.25     # output-flange blind holes: 0.05 AND
+                                      # 0.15 both printed too tight — vertical
+                                      # blind holes shrink ~0.25 here (vs ~0.1
+                                      # on the cup's bed-face holes). 0.25
+                                      # targets a light press; retain with 638
+  # Cam-to-motor fit: the cam's D-bore rides the NEMA 17's Ø5 D-shaft (flat
+  # leaves 4.5 -> flat plane at x = 2.0). Vertical bores shrink MORE than the
+  # bed-face pin holes above (Ø5.2 printed hammer-tight while the cup's 6.10
+  # pressed perfectly); these target an easy slide fit — the flat carries
+  # the torque, not the bore.
+  motor_bore_clearance: 0.35          # diametral, added to the Ø5 shaft
+  motor_flat_clearance: 0.20          # added to the flat's 2.0 mm standoff
+  pin_hole_chamfer: 0.6               # lead-in chamfer depth at each hole mouth
+  output_pin_length: 25.0      # Ø6 x 25 steel dowel pins into the flange
   output_pin_bcd: 36.0         # drive-pin bolt circle on the output flange
-  output_pin_press_fit: 0.1    # diametral interference of the printed pin holes
-  output_hole_clearance: 0.3   # diametral, on the disc holes (Ø = pin + 2e + this)
-  shaft_diameter: 8.0          # main joint shaft (608-2RS + shaft collars in the ears)
-  shaft_bore_clearance: 0.2    # diametral; bore is closed by the pinch clamp
-  shaft_engagement: 10.0       # shaft depth in the output hub's blind bore
-  mount_bolt_circle: 66.0      # 6 x M3 into heat-set inserts in the linkage ear disc
+  output_hole_clearance: 0.3   # diametral, on the DISC holes (Ø = pin + 2e + this)
+  profile_print_clearance: 0.25  # radial, hobbed into the disc lobe profile;
+                               # 0.15 printed too tight — tune on a test disc
+  # Live-shaft drive (v5): the 8 mm joint shaft IS the torque path. The
+  # smooth shaft slips into the output's Ø8.35 bore and a split PINCH on the
+  # extension clamps it (M3 cross-bolt, captured nut); the arm hub grabs the
+  # other end with its own press bore + pinch. The extension's Ø25.05 seat
+  # carries a 6805 bearing in the drive ear (the joint's -Y support), and
+  # the Ø24.6 body must slide through that bearing's bore at assembly.
+  # Mirror of the GBX_EXT_* contract constants in
+  # engineering/fusion/robot_linkages/linkage_geometry.py.
+  shaft_diameter: 8.0          # live joint shaft; smooth, clamped by pinches
+  shaft_bore_clearance: 0.35   # diametral, on the output's shaft bore. 0.1
+                               # printed too tight to enter (vertical bores
+                               # shrink hardest — same lesson as the cam
+                               # D-bore above); 0.35 = the print-verified
+                               # easy-slide value. Extra gap costs nothing:
+                               # the pinch closes it onto the shaft.
+  hub_diameter: 22.0           # output hub Ø inside the lid. The lid's face
+                               # bore is derived from ext_seat_od (+0.8), NOT
+                               # from this — the old Ø23 "journal" could never
+                               # pass the Ø25.05 seat at assembly, so v5
+                               # REPRINTS the lids (cup/discs/cam still stay)
+  ext_body_od: 24.6            # extension body past the lid face (must pass
+                               # the drive-ear 6805's Ø25 bore)
+  ext_seat_od: 25.05           # 6805 inner-race seat, light press
+  ext_seat_len: 7.0            # = 6805 width = the ear pocket depth
+  pinch_len: 9.0               # split-pinch section between ear and arm hub
+  pinch_bolt_offset: 8.5       # M3 cross-bolt chord offset from the axis
+  ext_extension: 21.75         # beyond the lid face = ear 12 + gap 0.75
+                               # + pinch 9
+  mount_bolt_circle: 66.0      # 6 x M3 x 40 from the gearbox BACK, through cup
+                               # + lid, into the ear disc's heat-set inserts —
+                               # they clamp the casing AND mount it
   mount_bolt_count: 6
-  mount_hole_diameter: 3.2     # snug on M3 so the screws center the housing
-  mount_flange_diameter: 76.0  # matches the ear disc (GBX_FLANGE_D in linkage_geometry)
-  mount_flange_thickness: 4.0
+  mount_hole_diameter: 3.2     # snug on M3 so the screws center the casing
+  casing_diameter: 76.0        # straight Ø76 cylinder = the ear disc diameter

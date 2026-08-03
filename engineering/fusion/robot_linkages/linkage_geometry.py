@@ -28,15 +28,23 @@ Architecture (fixes the v1 interference audit — see git history):
     yaw axis so the upper arm's Ø26 shoulder hub (+ pinch hardware) swings
     clear through the full 0..180 deg shoulder range.
 
-  Pitch joints (shoulder, elbow — identical):
-    608 bearings in the clevis ears carry structural loads; the 8 mm shaft
-    transmits torque; the driven hub grips the shaft with a printed pinch
-    clamp (vertical M3 + captured nut). No enclosed gearbox drum: the
-    drive-side ear is a Ø76 disc whose OUTBOARD FACE is the gearbox mounting
-    flange (6 x M3 heat-set inserts on a Ø66 bolt circle). The cycloidal
-    cartridge (Ø62 x 38.4, engineering/fusion/cycloidal_gearbox) bolts on via
-    a Ø76 front flange and carries the NEMA 17 on its own back plate, so the
-    drive is assemblable and serviceable from outside the link.
+  Pitch joints (shoulder, elbow — identical; v5 "live shaft"):
+    The 8 mm shaft IS the torque path: it spins with the driven link. The
+    smooth rod (no flats) is grabbed at both ends by press/slip bores
+    closed with split pinches — one in the arm hub (Ø30 boss, slit on the
+    -X side, two M3 cross-bolts with captured nuts), one on the cycloidal
+    output's extension. Structural loads still ride on bearings, now in
+    the EARS: the +Y ear houses a 608 (outer race in the ear, inner race
+    on the shaft) and the drive ear houses a 6805 riding the output
+    extension's Ø25.05 seat. The drive ear sits GBX_PINCH_LEN + gap
+    further outboard than the +Y ear so the output's pinch section has
+    open access between ear and hub. No enclosed gearbox drum: the
+    drive-side ear is a Ø76 disc whose OUTBOARD FACE is the gearbox
+    mounting flange (6 x M3 heat-set inserts on a Ø66 bolt circle). The
+    cartridge (Ø76 x 36, engineering/fusion/cycloidal_gearbox) bolts on
+    with through-screws from its back and carries the NEMA 17 on its own
+    back plate — and mounting the gearbox threads its extension through
+    the drive ear's 6805 and delivers the pinch to the shaft end.
 
   Upper arm (the ±150 deg elbow fix):
     A single mid-plane beam cannot coexist with the forearm folded 150 deg —
@@ -55,7 +63,7 @@ import re
 # Purchased hardware (verified against engineering/standard parts/*.step)
 # ---------------------------------------------------------------------------
 
-# 608 deep-groove bearing (8 x 22 x 7) — one per clevis ear
+# 608 deep-groove bearing (8 x 22 x 7) — two per driven hub (dead axle)
 BRG_OD = 22.0
 BRG_W = 7.0
 BRG_POCKET_D = BRG_OD + 0.2     # light press after printing
@@ -80,15 +88,22 @@ NEMA_SHAFT_D = 5.0
 NEMA_SHAFT_LEN = 23.5           # above the mounting face (measured)
 NEMA_SHAFT_LEN_MAX = 25.0
 
-# 8 mm hardened steel shaft — torque path gearbox output -> driven hub
+# 8 mm hardened steel shaft — LIVE since v5 (the press-fit rev): the shaft
+# IS the torque path and spins with the driven link. Smooth rod, no flats:
+# the arm hub and the gearbox output each grab it with a press/slip bore
+# closed by a split pinch. It rides a 608 in the +Y ear; drive-side
+# support is the 6805 on the output extension's seat in the drive ear.
 SHAFT_D = 8.0
-SHAFT_BORE_D = SHAFT_D + 0.4
+HUB_BORE_D = SHAFT_D + 0.35     # slip fit: +0.1 printed too tight to enter
+                                # (FDM bore shrink); the pinch closes the gap
 
 # 8 mm shaft collar (set-screw, ~Ø18 x 9): axial keeper outboard of the +Y ear
 COLLAR_OD = 18.0
 COLLAR_W = 9.0
 
-# T8 lead-screw flanged nut (gripper actuation, forearm tip)
+# T8 lead-screw flanged nut (gripper actuation). Since the forearm-tip rev
+# the nut lives in the gripper's yoke, not the plate; the plate keeps the
+# Ø10.5 bore (gripper pilot register + wiring) and the Ø16 insert BCD.
 T8_BORE_D = 10.5
 T8_FLANGE_D = 22.5
 T8_FLANGE_T = 3.6
@@ -106,16 +121,32 @@ INSERT_D = 4.6
 INSERT_POCKET = 6.5
 
 # Cycloidal gearbox cartridge (envelope contract with cycloidal_gearbox.py):
-# Ø62 x 38.4 body + Ø76 x 4 front mounting flange (bolts to the ear disc
-# face), NEMA 17 on its own back plate. The linkage provides the mounting
-# face only. Keep-out keeps the historical Ø66 (conservative on the real
-# Ø62 body); the length grew in v2 to embed the Ø6 x 25 steel output pins.
-GBX_BODY_D = 66.0
-GBX_BODY_L = 38.4
-GBX_FLANGE_D = 76.0
-GBX_FLANGE_T = 4.0
+# a plain Ø76 x 36 two-part casing (cup + lid pinned by the Ø6 x 25 ring
+# dowels) whose lid face bolts to the ear disc: six M3 x 40 through-bolts
+# from the cartridge BACK into the ear's inserts, heads proud ~1 mm at the
+# back beside the NEMA 17 on the cup's back plate. The linkage provides the
+# mounting face only.
+GBX_BODY_D = 76.0
+GBX_BODY_L = 36.0
+GBX_FLANGE_D = 76.0             # = GBX_BODY_D since v3 (straight casing)
 GBX_BCD = 66.0                  # 6 x M3 into inserts in the ear disc face
 GBX_BOLT_N = 6
+# Output-extension contract (live-shaft rev; mirror of the ext_* keys in
+# engineering/gearboxes/gear_parameters.yaml): past the lid face the
+# output's Ø22 hub steps to a Ø25.05 seat carrying the drive ear's 6805,
+# then a Ø24.6 split-pinch body that clamps the live shaft in the open
+# gap before the arm hub. The shaft reaches GBX_SHAFT_REACH_IN past the
+# lid face INTO the output's Ø8.35 bore.
+GBX_EXT_OD = 24.6
+GBX_SEAT_OD = 25.05
+GBX_PINCH_LEN = 9.0
+GBX_EXT_HW_D = 27.0             # pinch-bolt hardware swing envelope
+GBX_SHAFT_REACH_IN = -2.25      # shaft tip relative to the lid face
+                                # (negative = shy of it). Sized so the two
+                                # EXISTING 68 mm shafts, cut for the
+                                # dead-axle rev, are reused unmodified: the
+                                # tip still sits 19.5 mm deep in the
+                                # extension bore, past the whole pinch.
 
 # ---------------------------------------------------------------------------
 # Frozen link geometry (defaults; overridden by config/robot.yaml at runtime)
@@ -164,11 +195,15 @@ JOURNAL_D = 25.0                # = 6805 bore
 JOURNAL_Z0 = PAN_H + 0.5        # 50.5: spins 0.5 above the pan plate
 JOURNAL_Z1 = YAW_BRG_Z0 + YAW_BRG_W         # 58.5: bearing top = body shoulder
 CLAMP_D = 28.0                  # presses the inner race, clears the outer
-COUPLING_TOP = JOURNAL_Z1 + 11.0            # 69.5
+COUPLING_TOP = JOURNAL_Z1 + 10.0            # 68.5 (trimmed 1 mm in the
+                                # dead-axle rev to keep the Ø30 hub's swing
+                                # circle clear of the column plate)
 COUPLING_BORE_D = 5.2
 COUPLING_FLAT_X = 2.05          # D-flat plane (NEMA 17 flat: 4.5 across)
 COUPLING_BCD = 17.0             # 4 x M3 inserts, column bolts down into them
 CLAMP_SLIT_Z0 = JOURNAL_Z1 + 1.0            # keep the journal round
+CLAMP_SLIT_HALF = 0.75          # split-pinch slit (base coupling only: the
+                                # pitch-joint hub pinches are gone since v3)
 CLAMP_BOLT_X = 10.5             # cross-bolt chord offset
 CLAMP_BOLT_Z = 63.0
 
@@ -176,21 +211,31 @@ CLAMP_BOLT_Z = 63.0
 # Pitch joints (shared by shoulder and elbow)
 # ---------------------------------------------------------------------------
 
-HUB_D = 26.0                    # driven hub: small so the column plate +
-HUB_W = 26.0                    # screw heads fit under its swing circle
-HUB_KEEPOUT_R = 14.2            # hub + pinch hardware swing envelope + margin
+HUB_D = 30.0                    # driven hub: pinch-clamps the live shaft
+HUB_W = 26.0
+HUB_KEEPOUT_R = 15.2            # hub swing envelope + margin (pinch bolt
+                                # heads and nuts are recessed inside this)
+HUB_SLIT_HALF = 0.75            # split-pinch slit half-thickness (-X side,
+                                # away from the beam root)
+HUB_BOLT_X = 9.5                # pinch cross-bolt chord offset from center
+HUB_BOLT_DY = 6.5               # two bolts at y = +/- this about hub center
+HUB_SPOT_Z = 8.0                # spot-face floor below center (head sunk)
+HUB_NUT_Z0 = 7.4                # captured-nut slot, floor above center...
+HUB_NUT_Z1 = 10.0               # ...to its ceiling (opens at the hub face)
 
 EAR_T = 12.0
 JOINT_GAP = 0.75
-EAR_IN = HUB_W / 2 + JOINT_GAP              # 13.75
+EAR_IN = HUB_W / 2 + JOINT_GAP              # 13.75 (+Y ear)
 EAR_OUT = EAR_IN + EAR_T                    # 25.75
-EAR_BOSS_D = 46.0               # plain (+Y) ear boss around the bearing
+EAR_IN_D = EAR_IN + GBX_PINCH_LEN + JOINT_GAP   # 23.5: drive ear sits
+                                # outboard so the output's pinch section has
+                                # open access between ear and hub
+EAR_OUT_D = EAR_IN_D + EAR_T                # 35.5 = gearbox mounting plane
+EAR_BOSS_D = 46.0               # plain (+Y) ear boss, houses the joint 608
 EAR_DISC_D = 76.0               # drive (-Y) ear disc = gearbox mounting face
-
-# Hub pinch clamp: horizontal slit on the side away from the beam, vertical
-# M3 + captured nut. All hardware stays inside the hub's swing envelope.
-PINCH_BOLT_X = 8.5              # offset from the hub axis, on the slit side
-PINCH_SLIT_HALF = 0.75
+EAR_PASS_D = 27.0               # drive-ear shoulder bore: clears the Ø24.6
+                                # extension, retains the 6805 race inboard
+EAR_6805_POCKET_D = YAW_BRG_OD + 0.3        # 37.3, from the outboard face
 
 # Yaw-boss relief in the column: the shoulder's -Y ear disc (Ø76 about the
 # shoulder axis) reaches down to z = shoulder_z - 38 and would orbit through
@@ -205,17 +250,19 @@ BOSS_RELIEF_TOP2 = PAN_H + M3_HEAD_H + 1.5  # 54.5
 # Column plate (theta-1 output) under the shoulder hub
 COL_PLATE_D = 68.0
 COL_PLATE_T = 5.0
-COL_PLATE_Z0 = COUPLING_TOP                 # 69.5
-COL_PLATE_TOP = COL_PLATE_Z0 + COL_PLATE_T  # 74.5
+COL_PLATE_Z0 = COUPLING_TOP                 # 68.5
+COL_PLATE_TOP = COL_PLATE_Z0 + COL_PLATE_T  # 73.5
 SHAFT_TIP_RECESS_D = 8.5
-SHAFT_TIP_RECESS_TOP = COL_PLATE_Z0 + 2.5   # 72
+SHAFT_TIP_RECESS_TOP = COL_PLATE_Z0 + 3.0   # 71.5
 EAR_SUPPORT_HALF_X = 23.0       # support boxes under the clevis bosses
 
 # Beams (upper arm is a twin-beam clevis; see module docstring)
 UA_BEAM_HALF_H = 14.0           # central beam z = shoulder_z -14 .. +14
 UA_BEAM_HALF_W = 12.0
 UA_SIDE_HALF_H = 13.0           # side beams / web z = shoulder_z -13 .. +13
-UA_SIDE_Y_OUT = EAR_OUT - 1.0   # 24.75: 1 mm off the gearbox flange plane
+UA_SIDE_Y_OUT = EAR_OUT - 1.0   # 24.75 (+Y side): 1 mm off the ear face
+UA_SIDE_Y_OUT_D = EAR_OUT_D - 1.0   # 34.5 (-Y side): 1 mm off the gearbox
+                                # flange plane — the arm is asymmetric now
 UA_WEB_LEN = 10.0
 FA_BEAM_HALF_H = 12.0
 FA_BEAM_HALF_W = 12.0
@@ -411,17 +458,25 @@ class Checks:
 
 def add_clevis(part, jx, jz):
     """Ear bosses about the pitch axis at (jx, ., jz): plain Ø46 boss on +Y,
-    Ø76 disc on -Y whose outboard face is the gearbox mounting flange."""
+    Ø76 disc on -Y (further outboard, past the output's pinch section)
+    whose outboard face is the gearbox mounting flange."""
     part.add(Cyl((jx, EAR_IN, jz), (jx, EAR_OUT, jz), EAR_BOSS_D))
-    part.add(Cyl((jx, -EAR_IN, jz), (jx, -EAR_OUT, jz), EAR_DISC_D))
+    part.add(Cyl((jx, -EAR_IN_D, jz), (jx, -EAR_OUT_D, jz), EAR_DISC_D))
 
 
-def cut_bearing_bores(part, jx, jz):
-    """608 pockets from each ear's outer face; Ø16 retention bore through."""
-    part.cut(Cyl((jx, -EAR_OUT - 1, jz), (jx, EAR_OUT + 1, jz), BRG_RETAIN_D))
-    for s in (+1, -1):
-        part.cut(Cyl((jx, s * (EAR_OUT - BRG_W), jz), (jx, s * (EAR_OUT + 1), jz),
-                     BRG_POCKET_D))
+def cut_joint_bores(part, jx, jz):
+    """+Y ear: 608 pocket from the inboard face (outer race in the ear,
+    inner race on the live shaft) behind a Ø16 retaining lip. -Y (drive)
+    ear: Ø37.3 6805 pocket from the outboard (gearbox) face — the output
+    extension's Ø25.05 seat rides its bore — behind a Ø27 shoulder that
+    clears the spinning Ø24.6 pinch body and retains the race inboard."""
+    part.cut(Cyl((jx, EAR_IN - 1, jz), (jx, EAR_OUT + 1, jz), BRG_RETAIN_D))
+    part.cut(Cyl((jx, EAR_IN - 0.1, jz), (jx, EAR_IN + BRG_W, jz),
+                 BRG_POCKET_D))
+    part.cut(Cyl((jx, -EAR_IN_D + 1, jz), (jx, -EAR_OUT_D - 1, jz),
+                 EAR_PASS_D))
+    part.cut(Cyl((jx, -(EAR_OUT_D - YAW_BRG_W), jz), (jx, -EAR_OUT_D - 1, jz),
+                 EAR_6805_POCKET_D))
 
 
 def cut_gearbox_mount(part, jx, jz):
@@ -435,22 +490,32 @@ def cut_gearbox_mount(part, jx, jz):
                      INSERT_D))
 
 
-def add_hub(part, jx, jz, slit_toward=-1):
-    """Driven hub on the 8 mm shaft with a printed pinch clamp: horizontal
-    slit on the side away from the beam (slit_toward = -1 -> -X), vertical
-    M3 + captured nut. Hardware stays inside the hub swing envelope."""
+def add_clamp_hub(part, jx, jz):
+    """Driven hub, live-shaft rev: a solid Ø30 x 26 boss whose Ø8.35
+    slip bore is closed onto the shaft by a split pinch — a radial
+    slit on the -X side (away from the beam root) squeezed by two M3
+    cross-bolts along Z with captured nuts. The nut slots open at the hub
+    faces for insertion; heads sink into spot faces so nothing swings
+    outside HUB_KEEPOUT_R. Torque enters the link from the shaft itself;
+    the joint's bearings live in the ears now, not the hub.
+    Call AFTER the link's beam adds: the bore must carve the beam root."""
     part.add(Cyl((jx, -HUB_W / 2, jz), (jx, HUB_W / 2, jz), HUB_D))
-    part.cut(Cyl((jx, -HUB_W / 2 - 1, jz), (jx, HUB_W / 2 + 1, jz), SHAFT_BORE_D))
-    s = slit_toward
-    x_far = jx + s * (HUB_D / 2 + 1)
-    x_near = jx + s * 2.0
-    part.cut(Box(min(x_far, x_near), max(x_far, x_near), -HUB_W / 2 - 1,
-                 HUB_W / 2 + 1, jz - PINCH_SLIT_HALF, jz + PINCH_SLIT_HALF))
-    bx = jx + s * PINCH_BOLT_X
-    part.cut(Cyl((bx, 0, jz - 8), (bx, 0, jz + 8), M3_CLEAR_D))
-    part.cut(Cyl((bx, 0, jz + 4.5), (bx, 0, jz + 11), M3_CB_D))          # head
-    part.cut(Box(bx - M3_NUT_AF / 2 - 0.1, bx + M3_NUT_AF / 2 + 0.1,     # nut
-                 -M3_NUT_T / 2 - 0.5, M3_NUT_T / 2 + 0.5, jz - 11, jz - 4.6))
+    part.cut(Cyl((jx, -HUB_W / 2 - 1, jz), (jx, HUB_W / 2 + 1, jz),
+                 HUB_BORE_D))
+    part.cut(Box(jx - HUB_D / 2 - 1, jx - HUB_BORE_D / 2 + 0.2,
+                 -HUB_W / 2 - 1, HUB_W / 2 + 1,
+                 jz - HUB_SLIT_HALF, jz + HUB_SLIT_HALF))
+    bx = jx - HUB_BOLT_X
+    for sy in (+1, -1):
+        y = sy * HUB_BOLT_DY
+        part.cut(Cyl((bx, y, jz - HUB_D / 2 - 1), (bx, y, jz + HUB_D / 2 + 1),
+                     M3_CLEAR_D))
+        part.cut(Cyl((bx, y, jz - HUB_D / 2 - 1), (bx, y, jz - HUB_SPOT_Z),
+                     M3_CB_D))
+        part.cut(Box(bx - M3_NUT_AF / 2 - 0.1, bx + M3_NUT_AF / 2 + 0.1,
+                     sy * (HUB_BOLT_DY - M3_NUT_T / 2 - 0.5),
+                     sy * (HUB_W / 2 + 1),
+                     jz + HUB_NUT_Z0, jz + HUB_NUT_Z1))
 
 
 # ---------------------------------------------------------------------------
@@ -503,7 +568,7 @@ def build_shaft_coupling():
     # pinch: slit through +X (journal left solid), one M3 cross bolt with a
     # captured nut (-Y pocket, breaks out the side for insertion) and a
     # +Y spot face. z chosen clear of the insert pockets above.
-    p.cut(Box(2.0, CLAMP_D / 2 + 1, -PINCH_SLIT_HALF, PINCH_SLIT_HALF,
+    p.cut(Box(2.0, CLAMP_D / 2 + 1, -CLAMP_SLIT_HALF, CLAMP_SLIT_HALF,
               CLAMP_SLIT_Z0, COUPLING_TOP + 1))
     p.cut(Cyl((CLAMP_BOLT_X, -CLAMP_D / 2 - 1, CLAMP_BOLT_Z),
               (CLAMP_BOLT_X, CLAMP_D / 2 + 1, CLAMP_BOLT_Z), M3_CLEAR_D))
@@ -524,9 +589,16 @@ def build_yaw_column(shoulder_z):
     face on the -Y ear disc."""
     p = Part('rt_yaw_column')
     p.add(Cyl((0, 0, COL_PLATE_Z0), (0, 0, COL_PLATE_TOP), COL_PLATE_D))
-    for s in (+1, -1):
+    # the Ø68 plate is centered on the YAW axis, so its rim would reach
+    # |y| = 34 — 8 mm past the gearbox mounting plane at EAR_OUT, shelving
+    # into the shoulder cartridge. Trim it flush with both ear faces.
+    for s, e_out in ((+1, EAR_OUT), (-1, EAR_OUT_D)):
+        p.cut(Box(-COL_PLATE_D / 2 - 1, COL_PLATE_D / 2 + 1,
+                  s * e_out, s * (COL_PLATE_D / 2 + 1),
+                  COL_PLATE_Z0 - 1, COL_PLATE_TOP + 1))
+    for s, e_in, e_out in ((+1, EAR_IN, EAR_OUT), (-1, EAR_IN_D, EAR_OUT_D)):
         p.add(Box(-EAR_SUPPORT_HALF_X, EAR_SUPPORT_HALF_X,
-                  s * EAR_IN, s * EAR_OUT, COL_PLATE_Z0 + 1.5, shoulder_z))
+                  s * e_in, s * e_out, COL_PLATE_Z0 + 1.5, shoulder_z))
     add_clevis(p, 0, shoulder_z)
     # coupling interface: shaft-tip recess + 4 x M3 counterbored through holes
     p.cut(Cyl((0, 0, COL_PLATE_Z0 - 1), (0, 0, SHAFT_TIP_RECESS_TOP),
@@ -536,7 +608,7 @@ def build_yaw_column(shoulder_z):
     p.cut_bolt_circle_z(0, 0, COUPLING_BCD, 4, M3_CB_D,
                         COL_PLATE_TOP - M3_HEAD_H, COL_PLATE_TOP + 1,
                         clock_deg=45)
-    cut_bearing_bores(p, 0, shoulder_z)
+    cut_joint_bores(p, 0, shoulder_z)
     cut_gearbox_mount(p, 0, shoulder_z)
     # yaw-boss relief: keep the ear disc clear of the stationary boss and the
     # motor screw heads through full yaw (see BOSS_RELIEF_* above)
@@ -570,46 +642,44 @@ def build_upper_arm(shoulder_z, l_upper, theta3_range):
     mounting face. The hand-off station is derived, not guessed."""
     beam_end, web_x0, _ = ua_stations(l_upper, theta3_range)
     p = Part('rt_upper_arm')
-    add_hub(p, 0, shoulder_z, slit_toward=-1)
     p.add(Box(0, beam_end, -UA_BEAM_HALF_W, UA_BEAM_HALF_W,
               shoulder_z - UA_BEAM_HALF_H, shoulder_z + UA_BEAM_HALF_H))
-    p.add(Box(web_x0, beam_end, -UA_SIDE_Y_OUT, UA_SIDE_Y_OUT,
+    p.add(Box(web_x0, beam_end, -UA_SIDE_Y_OUT_D, UA_SIDE_Y_OUT,
               shoulder_z - UA_SIDE_HALF_H, shoulder_z + UA_SIDE_HALF_H))
-    for s in (+1, -1):
-        p.add(Box(web_x0, l_upper, s * EAR_IN, s * UA_SIDE_Y_OUT,
+    for s, y_in, y_out in ((+1, EAR_IN, UA_SIDE_Y_OUT),
+                           (-1, EAR_IN_D, UA_SIDE_Y_OUT_D)):
+        p.add(Box(web_x0, l_upper, s * y_in, s * y_out,
                   shoulder_z - UA_SIDE_HALF_H, shoulder_z + UA_SIDE_HALF_H))
     add_clevis(p, l_upper, shoulder_z)
-    # re-cut the hub bore/slit region shadowed by the beam root: the beam box
-    # starts at x=0 over the bore; re-cut bore after all adds
-    p.cut(Cyl((0, -HUB_W / 2 - 1, shoulder_z), (0, HUB_W / 2 + 1, shoulder_z),
-              SHAFT_BORE_D))
-    cut_bearing_bores(p, l_upper, shoulder_z)
+    add_clamp_hub(p, 0, shoulder_z)     # after the beams: bore carves the root
+    cut_joint_bores(p, l_upper, shoulder_z)
     cut_gearbox_mount(p, l_upper, shoulder_z)
     return p
 
 
 def build_forearm(shoulder_z, l_upper, l_fore):
-    """Elbow hub -> beam -> gripper interface plate (T8 flanged-nut pattern);
-    the plate's outer face is the TCP plane."""
+    """Elbow hub -> beam -> gripper interface plate; the plate's outer face
+    is the TCP plane. Interface rev with the gripper redesign: the 4 x M3
+    insert pockets on the Ø16 BCD open on the OUTER face (the v1 inner-face
+    pockets and nut recess sat unreachable under the beam — the T8 nut now
+    lives in the gripper's yoke). The Ø10.5 bore stays: it registers the
+    gripper's pilot boss; a bottom-edge notch passes the gripper wiring."""
     ex, tcp = l_upper, l_upper + l_fore
     plate_x0 = tcp - FA_PLATE_T
     p = Part('rt_forearm')
-    add_hub(p, ex, shoulder_z, slit_toward=-1)
     p.add(Box(ex, plate_x0 + 1, -FA_BEAM_HALF_W, FA_BEAM_HALF_W,
               shoulder_z - FA_BEAM_HALF_H, shoulder_z + FA_BEAM_HALF_H))
     p.add(Box(plate_x0, tcp, -FA_PLATE_HALF, FA_PLATE_HALF,
               shoulder_z - FA_PLATE_HALF, shoulder_z + FA_PLATE_HALF))
-    p.cut(Cyl((ex, -HUB_W / 2 - 1, shoulder_z), (ex, HUB_W / 2 + 1, shoulder_z),
-              SHAFT_BORE_D))
+    add_clamp_hub(p, ex, shoulder_z)    # after the beam: bore carves the root
     p.cut(Cyl((plate_x0 - 1, 0, shoulder_z), (tcp + 1, 0, shoulder_z), T8_BORE_D))
-    p.cut(Cyl((plate_x0 - 1, 0, shoulder_z), (plate_x0 + T8_FLANGE_T, 0, shoulder_z),
-              T8_FLANGE_D))
     for i in range(4):
         a = math.radians(45) + i * math.pi / 2
         y = T8_BCD / 2 * math.cos(a)
         z = shoulder_z + T8_BCD / 2 * math.sin(a)
-        p.cut(Cyl((plate_x0 - 1, y, z),
-                  (plate_x0 + T8_FLANGE_T + INSERT_POCKET, y, z), INSERT_D))
+        p.cut(Cyl((tcp - INSERT_POCKET, y, z), (tcp + 1, y, z), INSERT_D))
+    p.cut(Box(plate_x0 - 0.1, tcp + 0.1, -4, 4,
+              shoulder_z - FA_PLATE_HALF - 1, shoulder_z - FA_BEAM_HALF_H - 2))
     return p
 
 
@@ -657,26 +727,30 @@ def column_screwhead_solids():
 
 
 def gearbox_keepout(jx, jz, tag):
-    """Cartridge + flange + its screw heads + NEMA 17 hanging outboard -Y."""
+    """Cartridge + its through-bolt heads (at the cartridge back) + NEMA 17
+    hanging outboard -Y."""
     p = Part(f'ko_gearbox_{tag}')
-    p.add(Cyl((jx, -EAR_OUT, jz), (jx, -EAR_OUT - GBX_BODY_L, jz), GBX_BODY_D))
-    p.add(Cyl((jx, -EAR_OUT, jz), (jx, -EAR_OUT - GBX_FLANGE_T, jz), GBX_FLANGE_D))
+    p.add(Cyl((jx, -EAR_OUT_D, jz), (jx, -EAR_OUT_D - GBX_BODY_L, jz),
+              GBX_BODY_D))
+    y_back = -EAR_OUT_D - GBX_BODY_L
     for i in range(GBX_BOLT_N):
         a = 2 * math.pi * i / GBX_BOLT_N
         x = jx + GBX_BCD / 2 * math.cos(a)
         z = jz + GBX_BCD / 2 * math.sin(a)
-        p.add(Cyl((x, -EAR_OUT - GBX_FLANGE_T, z),
-                  (x, -EAR_OUT - GBX_FLANGE_T - M3_HEAD_H, z), M3_HEAD_D))
+        p.add(Cyl((x, y_back, z), (x, y_back - 1.5, z), M3_HEAD_D))
     h = NEMA_SQ / 2 + 0.15
-    y0 = -EAR_OUT - GBX_BODY_L
-    p.add(Box(jx - h, jx + h, y0 - NEMA_LEN_MAX, y0, jz - h, jz + h))
+    p.add(Box(jx - h, jx + h, y_back - NEMA_LEN_MAX, y_back, jz - h, jz + h))
     return p
 
 
-def hub_pinch_hardware(jx, jz, slit_toward=-1):
-    p = Part(f'hw_pinch_{jx:.0f}')
-    bx = jx + slit_toward * PINCH_BOLT_X
-    p.add(Cyl((bx, 0, jz - 7), (bx, 0, jz + 7.6), M3_CB_D))
+def output_ext_solid(jx, jz, tag):
+    """Gearbox output extension: rotates WITH the shaft and driven link.
+    Inside the drive ear it is the Ø25.05 seat (in the 6805); in the open
+    gap it is the pinch section, modeled at the Ø27 hardware swing
+    envelope (cross-bolt head and nut ends included — conservative)."""
+    p = Part(f'hw_ext_{tag}')
+    p.add(Cyl((jx, -EAR_OUT_D, jz), (jx, -EAR_IN_D, jz), GBX_SEAT_OD))
+    p.add(Cyl((jx, -EAR_IN_D, jz), (jx, -HUB_W / 2 - 0.5, jz), GBX_EXT_HW_D))
     return p
 
 
@@ -729,9 +803,12 @@ def design(shoulder_z=None, l_upper=None, l_fore=None,
          9.2 - (COUPLING_BCD / 2 * math.sin(math.radians(45)) + INSERT_D / 2), 0.5)
     c.ck('counterbore vs shaft-tip recess',
          (COUPLING_BCD / 2 - M3_CB_D / 2) - SHAFT_TIP_RECESS_D / 2, 0.5)
+    c.ck('plate trim spares the coupling bolts',
+         EAR_OUT - (COUPLING_BCD / 2 * math.sin(math.radians(45))
+                    + M3_CB_D / 2), 2.0)
     c.ck('slit clears insert pockets (y)',
          COUPLING_BCD / 2 * math.sin(math.radians(45)) - INSERT_D / 2
-         - PINCH_SLIT_HALF, 0.5)
+         - CLAMP_SLIT_HALF, 0.5)
 
     # --- shoulder swing keep-outs (theta-2 full range) ---
     # everything on the column side near the yaw axis must sit below the
@@ -751,9 +828,13 @@ def design(shoulder_z=None, l_upper=None, l_fore=None,
     side_r_min = math.hypot(web_x0, UA_SIDE_HALF_H)
     c.ck('UA side band vs column ear boxes', side_r_min - box_reach, 1.0)
     c.ck('UA side band vs shoulder gearbox body', side_r_min - GBX_BODY_D / 2, 1.0)
-    c.ck('UA outer face vs gearbox flange plane', EAR_OUT - UA_SIDE_Y_OUT, 0.9)
+    c.ck('UA outer face vs +Y ear face plane', EAR_OUT - UA_SIDE_Y_OUT, 0.9)
+    c.ck('UA outer face vs gearbox flange plane',
+         EAR_OUT_D - UA_SIDE_Y_OUT_D, 0.9)
     c.ck('gearbox flange sweep vs pan top', (sz - GBX_FLANGE_D / 2) - PAN_H, 1.5)
-    c.ck('gearbox cartridge vs boss (radial)', EAR_OUT - BOSS_OD / 2, 1.5)
+    c.ck('gearbox cartridge vs boss (radial)', EAR_OUT_D - BOSS_OD / 2, 1.5)
+    c.ck('drive ear disc inner face vs yaw boss orbit',
+         EAR_IN_D - BOSS_OD / 2, 1.0)
     # the shoulder ear disc orbits the yaw axis: its relief cuts must clear
     # the boss and screw heads, yet spare the insert pockets and flange seat
     c.ck('disc relief vs boss (radial)', BOSS_RELIEF_R1 - BOSS_OD / 2, 1.0)
@@ -771,9 +852,9 @@ def design(shoulder_z=None, l_upper=None, l_fore=None,
         if za - INSERT_D / 2 < BOSS_RELIEF_TOP1:    # pocket dips into the relief zone
             pocket_r_xy = min(pocket_r_xy,
                               math.hypot(abs(xa) - INSERT_D / 2,
-                                         EAR_OUT - INSERT_POCKET))
+                                         EAR_OUT_D - INSERT_POCKET))
     c.ck('relief spares gearbox insert pockets', pocket_r_xy - BOSS_RELIEF_R1, 0.3)
-    c.ck('relief spares gearbox flange seat', EAR_OUT - BOSS_RELIEF_R1, 1.5)
+    c.ck('relief spares gearbox flange seat', EAR_OUT_D - BOSS_RELIEF_R1, 1.5)
 
     # --- elbow fold (theta-3 full range) ---
     r_beam = ex - beam_end
@@ -796,18 +877,55 @@ def design(shoulder_z=None, l_upper=None, l_fore=None,
          wedge_angle_clear_deg(math.hypot(ex, UA_BEAM_HALF_H), UA_BEAM_HALF_H,
                                sweep - SWEEP_MARGIN_DEG, FA_PLATE_HALF), 3.0)
 
-    # --- pitch joint internals ---
+    # --- pitch joint internals (live shaft) ---
     c.ck('hub running gap to ears', JOINT_GAP, 0.5)
-    c.ck('ear wall behind bearing pocket', EAR_T - BRG_W, 4.0)
-    c.ck('retention lip width', (BRG_POCKET_D - BRG_RETAIN_D) / 2, 2.0)
+    c.ck('+Y ear: 608 pocket plus retaining lip', EAR_T - BRG_W, 4.0)
+    c.ck('608 lip retains the outer race',
+         (BRG_POCKET_D - BRG_RETAIN_D) / 2, 2.0)
+    c.ck('608 lip clears the spinning shaft', (BRG_RETAIN_D - SHAFT_D) / 2, 2.0)
+    c.ck('+Y ear boss wall at the 608 pocket',
+         (EAR_BOSS_D - BRG_POCKET_D) / 2, 3.0)
+    c.ck('drive ear: 6805 pocket plus shoulder', EAR_T - YAW_BRG_W, 4.0)
+    c.ck('6805 shoulder retains the race',
+         (EAR_6805_POCKET_D - EAR_PASS_D) / 2, 2.0)
+    c.ck('drive-ear bore clears the spinning extension',
+         (EAR_PASS_D - GBX_EXT_OD) / 2, 0.5)
+    c.ck('ear disc wall at the 6805 pocket',
+         (EAR_DISC_D - EAR_6805_POCKET_D) / 2, 3.0)
+    c.ck('pinch section fits between ear and hub',
+         0.01 - abs((EAR_IN_D - HUB_W / 2) - (GBX_PINCH_LEN + 2 * JOINT_GAP)),
+         0.0)
+    c.ck('hub bore closes onto the shaft', HUB_BORE_D - SHAFT_D, 0.0)
+    # closing the bore by d diametral eats pi*d of slit width; worst case is
+    # a bore printed at full modeled size
+    c.ck('hub pinch slit travel closes the bore',
+         2 * HUB_SLIT_HALF - math.pi * (HUB_BORE_D - SHAFT_D), 0.3)
+    c.ck('hub wall at the bore', (HUB_D - HUB_BORE_D) / 2, 3.0)
+    c.ck('hub pinch bolts clear the bore',
+         HUB_BOLT_X - M3_CLEAR_D / 2 - HUB_BORE_D / 2, 1.5)
+    c.ck('pinch bolt heads inside the hub keepout',
+         HUB_KEEPOUT_R - math.hypot(HUB_BOLT_X, HUB_SPOT_Z + M3_HEAD_H), 0.5)
+    c.ck('nut seat floor inside the hub',
+         HUB_D / 2 - math.hypot(HUB_BOLT_X + M3_NUT_AF / 2 + 0.1, HUB_NUT_Z0),
+         0.3)
+    c.ck('nut slot clears the pinch slit',
+         HUB_NUT_Z0 - HUB_SLIT_HALF, 4.0)
+    c.ck('hub keepout covers the hub', HUB_KEEPOUT_R - HUB_D / 2, 0.0)
+    c.ck('shaft tip reaches past the pinch section',
+         (EAR_OUT_D + GBX_SHAFT_REACH_IN) - EAR_IN_D, 5.0)
     c.ck('gearbox insert ring inside disc',
          EAR_DISC_D / 2 - (GBX_BCD / 2 + INSERT_D / 2), 1.5)
-    c.ck('gearbox inserts clear bearing pocket',
-         (GBX_BCD / 2 - INSERT_D / 2) - BRG_POCKET_D / 2, 2.0)
-    c.ck('pinch nut slot wall to shaft bore',
-         (PINCH_BOLT_X - M3_NUT_AF / 2 - 0.1) - SHAFT_BORE_D / 2, 1.0)
-    c.ck('pinch bolt hole wall to shaft bore',
-         (PINCH_BOLT_X - M3_CLEAR_D / 2) - SHAFT_BORE_D / 2, 2.0)
+    c.ck('gearbox inserts clear the 6805 pocket',
+         (GBX_BCD / 2 - INSERT_D / 2) - EAR_6805_POCKET_D / 2, 2.0)
+
+    # --- gripper interface plate (forearm tip) ---
+    c.ck('gripper insert web to the TCP face', FA_PLATE_T - INSERT_POCKET, 2.0)
+    c.ck('gripper inserts inside the plate',
+         FA_PLATE_HALF - (T8_BCD / 2 + INSERT_D / 2), 3.0)
+    c.ck('gripper inserts clear the pilot bore',
+         (T8_BCD / 2 - INSERT_D / 2) - T8_BORE_D / 2, 0.3)
+    c.ck('wire notch height in the plate edge',
+         FA_PLATE_HALF - FA_BEAM_HALF_H - 2.0, 4.0)
 
     # --- printability ---
     for name, part in parts.items():
@@ -820,13 +938,15 @@ def design(shoulder_z=None, l_upper=None, l_fore=None,
         'hw_pan_screws': pan_screwhead_solids(),
         'hw_clamp_bolt': coupling_hardware_solid(),
         'hw_column_screws': column_screwhead_solids(),
-        'hw_pinch_shoulder': hub_pinch_hardware(0, sz),
-        'hw_pinch_elbow': hub_pinch_hardware(ex, sz),
+        'hw_ext_shoulder': output_ext_solid(0, sz, 'shoulder'),
+        'hw_ext_elbow': output_ext_solid(ex, sz, 'elbow'),
     }
     keepouts = {
         'ko_gearbox_shoulder': gearbox_keepout(0, sz, 'shoulder'),
         'ko_gearbox_elbow': gearbox_keepout(ex, sz, 'elbow'),
     }
+    # live joint shaft: collar face (+Y) to its reach inside the output bore
+    shaft_len = EAR_OUT + COLLAR_W + EAR_OUT_D + GBX_SHAFT_REACH_IN
     return {
         'parts': parts,
         'hardware': hardware,
@@ -835,6 +955,7 @@ def design(shoulder_z=None, l_upper=None, l_fore=None,
         'shoulder_z': sz, 'l_upper': l_upper, 'l_fore': l_fore,
         'theta2_range': theta2_range, 'theta3_range': theta3_range,
         'beam_end': beam_end, 'web_x0': web_x0,
+        'shaft_len': shaft_len,
         'warnings': warnings,
     }
 
@@ -843,7 +964,8 @@ if __name__ == '__main__':
     d = design()
     print(f"links {d['l_upper']:.0f}/{d['l_fore']:.0f}, shoulder z "
           f"{d['shoulder_z']:.0f}; UA hand-off at x={d['web_x0']:.0f}"
-          f"..{d['beam_end']:.0f}")
+          f"..{d['beam_end']:.0f}; live joint shafts cut to "
+          f"{math.ceil(d['shaft_len'])} mm (smooth — pinch-clamped)")
     print(d['checks'].report())
     fails = d['checks'].failures()
     print(f"\n{len(d['checks'].rows)} checks, {len(fails)} failed")
