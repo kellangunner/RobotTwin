@@ -202,20 +202,50 @@ export function sampleTrajectory(plan: TrajectoryPlan, t: number): TrajectorySam
   return wasm.sampleTrajectory(plan, t);
 }
 
+export interface CollisionResult {
+  colliding: boolean;
+  issues: string[];
+}
+
+let collisionFaultReported = false;
+
+/**
+ * Collision checks are the only calls that return long strings, so they are
+ * the first to break if the WASM↔JS string marshalling ever regresses (it did
+ * once: see GROWABLE_ARRAYBUFFERS in CMakeLists.txt). These are safety gates
+ * on every commanded motion, so a failure here must never take down the page
+ * and must never be read as "no collision" — fail closed, say so plainly, and
+ * let the UI surface it as a blocked move.
+ */
+function guardCollisionCall(fn: () => CollisionResult, where: string): CollisionResult {
+  try {
+    return fn();
+  } catch (err) {
+    if (!collisionFaultReported) {
+      collisionFaultReported = true;
+      console.error(`RobotTwin: ${where} failed inside the simulation core`, err);
+    }
+    return {
+      colliding: true,
+      issues: [`${where} unavailable — motion blocked (see console)`],
+    };
+  }
+}
+
 export function checkPose(
   q: JointAngles,
   geom: RobotConfig['links'],
   model: RobotConfig['collision'],
-): { colliding: boolean; issues: string[] } {
-  return wasm.checkPose(q, geom, model);
+): CollisionResult {
+  return guardCollisionCall(() => wasm.checkPose(q, geom, model), 'collision check');
 }
 
 export function checkPath(
   plan: TrajectoryPlan,
   geom: RobotConfig['links'],
   model: RobotConfig['collision'],
-): { colliding: boolean; issues: string[] } {
-  return wasm.checkPath(plan, geom, model);
+): CollisionResult {
+  return guardCollisionCall(() => wasm.checkPath(plan, geom, model), 'path collision check');
 }
 
 export function deriveGearbox(

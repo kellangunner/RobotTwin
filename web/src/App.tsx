@@ -18,19 +18,42 @@ class ErrorBoundary extends React.Component<{ children: ReactNode }, { error?: E
   }
 
   render() {
-    if (this.state.error) {
-      return (
-        <div className="flex h-screen flex-col gap-4 bg-zinc-100 p-4 text-zinc-800">
-          <h2 className="text-lg font-bold text-red-600">Error</h2>
-          <pre className="overflow-auto border border-zinc-400 bg-white p-2 text-sm text-red-700">
-            {this.state.error.message}
-            {'\n\n'}
-            {this.state.error.stack}
-          </pre>
+    const { error } = this.state;
+    if (!error) return this.props.children;
+
+    // A visitor gets a plain explanation and a way out; the stack stays
+    // available but folded away, and is logged for anyone actually debugging.
+    console.error('RobotTwin: unrecoverable UI error', error);
+    return (
+      <div className="grid-paper flex h-screen items-center justify-center p-4 text-zinc-800">
+        <div className="max-w-lg border border-zinc-400 bg-white p-5 shadow-sm">
+          <h2 className="mb-2 flex items-center gap-2 font-mono text-xs font-semibold uppercase tracking-widest text-red-600">
+            <span aria-hidden className="h-2 w-2 shrink-0 bg-red-600" />
+            Simulator stopped
+          </h2>
+          <p className="mb-3 text-sm leading-relaxed">
+            The twin hit an unexpected fault and could not keep running. This is a bug in
+            the simulator, not something you did — no robot state was lost.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mb-3 border border-orange-700 bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700"
+          >
+            ↻ Reload the simulator
+          </button>
+          <details className="text-xs">
+            <summary className="cursor-pointer text-zinc-500 hover:text-zinc-800">
+              Technical details
+            </summary>
+            <pre className="mt-2 max-h-56 overflow-auto border border-zinc-300 bg-zinc-50 p-2 text-[11px] text-red-700">
+              {error.message}
+              {'\n\n'}
+              {error.stack}
+            </pre>
+          </details>
         </div>
-      );
-    }
-    return this.props.children;
+      </div>
+    );
   }
 }
 
